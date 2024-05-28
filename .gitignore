@@ -9,3 +9,13 @@ install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
 _deps
+
+.vscode/
+wgpu-cmake/
+
+build/
+build-release/
+build-shared/
+build-shared-release/
+
+wgpu-native.zip
