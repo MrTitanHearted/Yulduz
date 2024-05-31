@@ -43,6 +43,6 @@ rem wgpu-cmake
 
 rem dependencies
 
-call vcpkg install glfw3 glm stb assimp EnTT --triplet=x64-windows-static
+call vcpkg install glfw3 glm stb assimp EnTT --triplet=x64-windows
 
 rem dependencies

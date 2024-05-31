@@ -22,6 +22,7 @@
 #include <chrono>
 #include <memory>
 #include <thread>
+#include <format>
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
@@ -44,8 +45,10 @@
 #define YULDUZ_PLATFORM_WINDOWS
 #elif defined(__APPLE__) || defined(__MACH__)
 #define YULDUZ_PLATFORM_OSX
+#define YULDUZ_PLATFORM_UNIX
 #elif defined(__linux__)
 #define YULDUZ_PLATFORM_LINUX
+#define YULDUZ_PLATFORM_UNIX
 #else
 #error Not supported platform
 #endif
