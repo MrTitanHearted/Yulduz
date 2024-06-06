@@ -7,63 +7,34 @@
 #include <Yulduz/Engine.hpp>
 
 namespace Yulduz {
-    class MyEvent : public IEvent {
-       public:
-        // MyEvent(const std::string &msg) : message(msg) {}
-        MyEvent(const std::string &msg) {
-            message = msg;
+    void testYulduz() {
+        std::shared_ptr<TextureAsset> wallTextureAsset = TextureAsset::FromPath("assets/textures/wall.jpg").value();
+        AssetManager assetManager;
+        assetManager.addAsset("wall", wallTextureAsset);
+
+        {
+            std::optional<std::shared_ptr<TextureAsset>> assetOption = assetManager.getAsset<TextureAsset>("wall");
+            if (assetOption) {
+                std::shared_ptr<TextureAsset> asset = assetOption.value();
+                YZINFO("Texture '{}' from path '{}' {}x{} size={} and channelCount={}",
+                       asset->getName(),
+                       asset->getPath(),
+                       asset->getWidth(),
+                       asset->getHeight(),
+                       asset->getSize(),
+                       asset->getChannelCount());
+            }
         }
-
-        std::string message;
-    };
-
-    class YourEvent : public IEvent {
-       public:
-        YourEvent(float x, float y) {
-            this->x = x;
-            this->y = y;
-        }
-
-        float x, y;
-    };
-
-    void printMyEvent(const MyEvent &event) {
-        YZDEBUG("My Event: '{}'", event.message);
-    }
-
-    void logYourEvent(const YourEvent &event) {
-        YZFATAL("Your Event: x={}, y={}", event.x, event.y);
     }
 
     void TestYulduz() {
-        Logger::Initialize(LogLevel::Debug);
+        Logger::Initialize(LogLevel::Info);
 
-        EventDispatcher eventDispatcher{};
-
-        eventDispatcher.setCallback<MyEvent>(printMyEvent);
-
-        eventDispatcher.addCallback<MyEvent>([](const MyEvent &event) {
-            YZWARN("Second Callback for My Event: '{}'", event.message);
-        });
-
-        eventDispatcher.addCallback<YourEvent>(logYourEvent);
-
-        eventDispatcher.addEvent(MyEvent("Hello, World!"));
-        eventDispatcher.addEvent(MyEvent("Hooray"));
-        eventDispatcher.addEvent(YourEvent(34.5, 54.1));
-        eventDispatcher.addEvent(YourEvent(342432.5, -32454.1));
-
-        eventDispatcher.dispatch();
-
-        eventDispatcher.removeFirstCallback<MyEvent>();
-        eventDispatcher.removeLastCallback<YourEvent>();
-
-        eventDispatcher.addEvent(MyEvent("Hello, World!"));
-        eventDispatcher.addEvent(MyEvent("Hooray"));
-        eventDispatcher.addEvent(YourEvent(34.5, 54.1));
-        eventDispatcher.addEvent(YourEvent(342432.5, -32454.1));
-
-        eventDispatcher.dispatch();
+        try {
+            testYulduz();
+        } catch (const std::exception &e) {
+            YZFATAL("Program throwed Exception: '{}'", e.what());
+        }
 
         Logger::Shutdown();
     }
