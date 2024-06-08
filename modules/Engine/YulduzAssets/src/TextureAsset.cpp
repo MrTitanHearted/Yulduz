@@ -92,7 +92,7 @@ namespace Yulduz {
 
     std::optional<std::shared_ptr<TextureAsset>> TextureAsset::FromPath(const std::string &path, bool flipVertically) {
         if (!fs::exists(path)) {
-            YZERROR("Failed to load a Texture Asset from path: '{}'", path);
+            YZERROR("Failed to find a Texture Asset from path: '{}'", path);
             return std::nullopt;
         }
 

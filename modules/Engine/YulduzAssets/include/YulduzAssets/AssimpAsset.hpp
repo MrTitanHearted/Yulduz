@@ -7,7 +7,7 @@
 namespace Yulduz {
     class AssimpAsset : public IAsset {
        public:
-        std::optional<std::shared_ptr<AssimpAsset>> FromPath(const std::string &path, AssimpPostProcess postProcess = AssimpPostProcess::None);
+        static std::optional<std::shared_ptr<AssimpAsset>> FromPath(const std::string &path, AssimpPostProcess postProcess = AssimpPostProcess::None);
 
        public:
         AssimpAsset(const std::string &path, const aiScene *scene);

@@ -31,7 +31,7 @@ namespace Yulduz {
 
     std::optional<std::shared_ptr<FileAsset>> FileAsset::FromPath(const std::string &path) {
         if (!fs::exists(path)) {
-            YZERROR("Failed to load File Asset from path: '{}'", path);
+            YZERROR("Failed to find a File Asset from path: '{}'", path);
             return std::nullopt;
         }
         std::ifstream file(path);
