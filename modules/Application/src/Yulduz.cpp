@@ -7,23 +7,23 @@
 #include <Yulduz/Engine.hpp>
 
 namespace Yulduz {
+    void keyCallback(const WindowKeyEvent &event) {
+        if (event.action != Action::PRESS) return;
+        if (event.key != KeyCode::KEY_ENTER) return;
+        YZINFO("HEEYYYYYYYYY");
+    }
+    
     void testYulduz() {
-        std::shared_ptr<TextureAsset> wallTextureAsset = TextureAsset::FromPath("assets/textures/wall.jpg").value();
-        AssetManager assetManager;
-        assetManager.addAsset("wall", wallTextureAsset);
+        EventDispatcher eventDispatcher{};
+        std::shared_ptr<Window> window = Window::New(Window::Settings{
+            .eventDispatcher = &eventDispatcher,
+        });
 
-        {
-            std::optional<std::shared_ptr<TextureAsset>> assetOption = assetManager.getAsset<TextureAsset>("wall");
-            if (assetOption) {
-                std::shared_ptr<TextureAsset> asset = assetOption.value();
-                YZINFO("Texture '{}' from path '{}' {}x{} size={} and channelCount={}",
-                       asset->getName(),
-                       asset->getPath(),
-                       asset->getWidth(),
-                       asset->getHeight(),
-                       asset->getSize(),
-                       asset->getChannelCount());
-            }
+        eventDispatcher.addCallback<WindowKeyEvent>(keyCallback);
+
+        while (window->isRunning()) {
+            Window::PollEvents();
+            eventDispatcher.dispatch();
         }
     }
 

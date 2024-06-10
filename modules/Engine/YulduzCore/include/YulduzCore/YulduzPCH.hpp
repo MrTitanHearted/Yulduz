@@ -9,6 +9,7 @@
 #include <iomanip>
 
 #include <vector>
+#include <array>
 #include <span>
 #include <string>
 #include <functional>
