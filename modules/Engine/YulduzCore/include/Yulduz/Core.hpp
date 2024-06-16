@@ -9,19 +9,19 @@
     inline Type operator|(Type a, Type b) {                                      \
         return static_cast<Type>(static_cast<Other>(a) | static_cast<Other>(b)); \
     }                                                                            \
-    inline Type operator|=(Type a, Type b) {                                     \
+    inline Type operator|=(Type &a, Type b) {                                    \
         return a = a | b;                                                        \
     }                                                                            \
     inline Type operator&(Type a, Type b) {                                      \
         return static_cast<Type>(static_cast<Other>(a) & static_cast<Other>(b)); \
     }                                                                            \
-    inline Type operator&=(Type a, Type b) {                                     \
+    inline Type operator&=(Type &a, Type b) {                                    \
         return a = a & b;                                                        \
     }                                                                            \
     inline Type operator^(Type a, Type b) {                                      \
         return static_cast<Type>(static_cast<Other>(a) ^ static_cast<Other>(b)); \
     }                                                                            \
-    inline Type operator^=(Type a, Type b) {                                     \
+    inline Type operator^=(Type &a, Type b) {                                    \
         return a = a ^ b;                                                        \
     }                                                                            \
     inline Type operator~(Type a) {                                              \

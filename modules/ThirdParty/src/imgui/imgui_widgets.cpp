@@ -1,4 +1,4 @@
-// dear imgui, v1.90.8 WIP
+// dear imgui, v1.90.8
 // (widgets code)
 
 /*
@@ -488,7 +488,7 @@ bool ImGui::ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool
 
     // Default only reacts to left mouse button
     if ((flags & ImGuiButtonFlags_MouseButtonMask_) == 0)
-        flags |= ImGuiButtonFlags_MouseButtonDefault_;
+        flags |= ImGuiButtonFlags_MouseButtonLeft;
 
     // Default behavior requires click + release inside bounding box
     if ((flags & ImGuiButtonFlags_PressedOnMask_) == 0)
@@ -1958,28 +1958,30 @@ bool ImGui::Combo(const char* label, int* current_item, const char* (*getter)(vo
         return false;
 
     // Display items
-    // FIXME-OPT: Use clipper (but we need to disable it on the appearing frame to make sure our call to SetItemDefaultFocus() is processed)
     bool value_changed = false;
-    for (int i = 0; i < items_count; i++)
-    {
-        const char* item_text = getter(user_data, i);
-        if (item_text == NULL)
-            item_text = "*Unknown item*";
-
-        PushID(i);
-        const bool item_selected = (i == *current_item);
-        if (Selectable(item_text, item_selected) && *current_item != i)
+    ImGuiListClipper clipper;
+    clipper.Begin(items_count);
+    clipper.IncludeItemByIndex(*current_item);
+    while (clipper.Step())
+        for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
         {
-            value_changed = true;
-            *current_item = i;
+            const char* item_text = getter(user_data, i);
+            if (item_text == NULL)
+                item_text = "*Unknown item*";
+
+            PushID(i);
+            const bool item_selected = (i == *current_item);
+            if (Selectable(item_text, item_selected) && *current_item != i)
+            {
+                value_changed = true;
+                *current_item = i;
+            }
+            if (item_selected)
+                SetItemDefaultFocus();
+            PopID();
         }
-        if (item_selected)
-            SetItemDefaultFocus();
-        PopID();
-    }
 
     EndCombo();
-
     if (value_changed)
         MarkItemEdited(g.LastItemData.ID);
 
@@ -2145,17 +2147,24 @@ void ImGui::DataTypeApplyOp(ImGuiDataType data_type, int op, void* output, const
 
 // User can input math operators (e.g. +100) to edit a numerical values.
 // NB: This is _not_ a full expression evaluator. We should probably add one and replace this dumb mess..
-bool ImGui::DataTypeApplyFromText(const char* buf, ImGuiDataType data_type, void* p_data, const char* format)
+bool ImGui::DataTypeApplyFromText(const char* buf, ImGuiDataType data_type, void* p_data, const char* format, void* p_data_when_empty)
 {
+    // Copy the value in an opaque buffer so we can compare at the end of the function if it changed at all.
+    const ImGuiDataTypeInfo* type_info = DataTypeGetInfo(data_type);
+    ImGuiDataTypeStorage data_backup;
+    memcpy(&data_backup, p_data, type_info->Size);
+
     while (ImCharIsBlankA(*buf))
         buf++;
     if (!buf[0])
+    {
+        if (p_data_when_empty != NULL)
+        {
+            memcpy(p_data, p_data_when_empty, type_info->Size);
+            return memcmp(&data_backup, p_data, type_info->Size) != 0;
+        }
         return false;
-
-    // Copy the value in an opaque buffer so we can compare at the end of the function if it changed at all.
-    const ImGuiDataTypeInfo* type_info = DataTypeGetInfo(data_type);
-    ImGuiDataTypeTempStorage data_backup;
-    memcpy(&data_backup, p_data, type_info->Size);
+    }
 
     // Sanitize format
     // - For float/double we have to ignore format with precision (e.g. "%.2f") because sscanf doesn't take them in, so force them into %f and %lf
@@ -3475,11 +3484,11 @@ bool ImGui::TempInputScalar(const ImRect& bb, ImGuiID id, const char* label, ImG
     {
         // Backup old value
         size_t data_type_size = type_info->Size;
-        ImGuiDataTypeTempStorage data_backup;
+        ImGuiDataTypeStorage data_backup;
         memcpy(&data_backup, p_data, data_type_size);
 
         // Apply new value (or operations) then clamp
-        DataTypeApplyFromText(data_buf, data_type, p_data, format);
+        DataTypeApplyFromText(data_buf, data_type, p_data, format, NULL);
         if (p_clamp_min || p_clamp_max)
         {
             if (p_clamp_min && p_clamp_max && DataTypeCompare(data_type, p_clamp_min, p_clamp_max) > 0)
@@ -3493,6 +3502,13 @@ bool ImGui::TempInputScalar(const ImRect& bb, ImGuiID id, const char* label, ImG
             MarkItemEdited(id);
     }
     return value_changed;
+}
+
+void ImGui::SetNextItemRefVal(ImGuiDataType data_type, void* p_data)
+{
+    ImGuiContext& g = *GImGui;
+    g.NextItemData.Flags |= ImGuiNextItemDataFlags_HasRefVal;
+    memcpy(&g.NextItemData.RefVal, p_data, DataTypeGetInfo(data_type)->Size);
 }
 
 // Note: p_data, p_step, p_step_fast are _pointers_ to a memory address holding the data. For an Input widget, p_step and p_step_fast are optional.
@@ -3509,8 +3525,13 @@ bool ImGui::InputScalar(const char* label, ImGuiDataType data_type, void* p_data
     if (format == NULL)
         format = DataTypeGetInfo(data_type)->PrintFmt;
 
+    void* p_data_default = (g.NextItemData.Flags & ImGuiNextItemDataFlags_HasRefVal) ? &g.NextItemData.RefVal : &g.DataTypeZeroValue;
+
     char buf[64];
-    DataTypeFormatString(buf, IM_ARRAYSIZE(buf), data_type, p_data, format);
+    if ((flags & ImGuiInputTextFlags_DisplayEmptyRefVal) && DataTypeCompare(data_type, p_data, p_data_default) == 0)
+        buf[0] = 0;
+    else
+        DataTypeFormatString(buf, IM_ARRAYSIZE(buf), data_type, p_data, format);
 
     flags |= ImGuiInputTextFlags_AutoSelectAll | (ImGuiInputTextFlags)ImGuiInputTextFlags_NoMarkEdited; // We call MarkItemEdited() ourselves by comparing the actual data rather than the string.
     flags |= (ImGuiInputTextFlags)ImGuiInputTextFlags_LocalizeDecimalPoint;
@@ -3519,7 +3540,7 @@ bool ImGui::InputScalar(const char* label, ImGuiDataType data_type, void* p_data
     if (p_step == NULL)
     {
         if (InputText(label, buf, IM_ARRAYSIZE(buf), flags))
-            value_changed = DataTypeApplyFromText(buf, data_type, p_data, format);
+            value_changed = DataTypeApplyFromText(buf, data_type, p_data, format, (flags & ImGuiInputTextFlags_ParseEmptyRefVal) ? p_data_default : NULL);
     }
     else
     {
@@ -3529,7 +3550,7 @@ bool ImGui::InputScalar(const char* label, ImGuiDataType data_type, void* p_data
         PushID(label);
         SetNextItemWidth(ImMax(1.0f, CalcItemWidth() - (button_size + style.ItemInnerSpacing.x) * 2));
         if (InputText("", buf, IM_ARRAYSIZE(buf), flags)) // PushId(label) + "" gives us the expected ID from outside point of view
-            value_changed = DataTypeApplyFromText(buf, data_type, p_data, format);
+            value_changed = DataTypeApplyFromText(buf, data_type, p_data, format, (flags & ImGuiInputTextFlags_ParseEmptyRefVal) ? p_data_default : NULL);
         IMGUI_TEST_ENGINE_ITEM_INFO(g.LastItemData.ID, label, g.LastItemData.StatusFlags | ImGuiItemStatusFlags_Inputable);
 
         // Step buttons
@@ -6502,7 +6523,7 @@ void ImGui::SetNextItemOpen(bool is_open, ImGuiCond cond)
         return;
     g.NextItemData.Flags |= ImGuiNextItemDataFlags_HasOpen;
     g.NextItemData.OpenVal = is_open;
-    g.NextItemData.OpenCond = cond ? cond : ImGuiCond_Always;
+    g.NextItemData.OpenCond = (ImU8)(cond ? cond : ImGuiCond_Always);
 }
 
 // CollapsingHeader returns true when opened but do not indent nor push into the ID stack (because of the ImGuiTreeNodeFlags_NoTreePushOnOpen flag).
@@ -7018,6 +7039,7 @@ bool ImGui::ListBox(const char* label, int* current_item, const char* (*getter)(
     bool value_changed = false;
     ImGuiListClipper clipper;
     clipper.Begin(items_count, GetTextLineHeightWithSpacing()); // We know exactly our line height here so we pass it as a minor optimization, but generally you don't need to.
+    clipper.IncludeItemByIndex(*current_item);
     while (clipper.Step())
         for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
         {

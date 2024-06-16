@@ -8,54 +8,59 @@ namespace Yulduz {
     class Window {
        public:
         struct Settings {
-            std::string name = "YulduzWindow";
+            std::string title = "Yulduz Window";
             uint32_t width = 1200;
             uint32_t height = 1000;
             bool resizable = true;
-            bool quitOnEscape = true;
             bool fullscreen = false;
-            bool fullscreenSize = false;
-            EventDispatcher *eventDispatcher = nullptr;
+            bool fullscreenSize = true;
+            std::optional<std::reference_wrapper<EventDispatcher>> eventDispatcher = std::nullopt;
         };
 
        public:
-        static std::shared_ptr<Window> New(Settings settings);
-        inline static std::shared_ptr<Window> Default() { return New(Settings{}); }
+        static void InitializeGlfw();
+        static void ShutdownGlfw();
         static void PollEvents();
+
+        static std::shared_ptr<Window> New(Settings Settings);
 
        public:
         Window(GLFWwindow *window);
         ~Window();
 
+        Window(const Window &) = delete;
+        Window &operator=(const Window &) = delete;
+
         void registerCallbacks(EventDispatcher &dispatcher);
         void setSize(uint32_t width, uint32_t height);
         void setCursorMode(CursorMode mode);
-        void minimize();
         void maximize();
+        void minimize();
         void restore();
+        void makeFullscreen(bool screenSize = true);
+        void makeWindowed();
         void close();
-        void setQuitOnEscape(bool quitOnEscape);
-
+        
+        GLFWwindow *get() const;
         std::string getTitle() const;
         std::array<uint32_t, 2> getSize() const;
         uint32_t getWidth() const;
         uint32_t getHeight() const;
         std::array<double, 2> getMousePosition() const;
-        double getMouseX() const;
-        double getMouseY() const;
+        uint32_t getMouseX() const;
+        uint32_t getMouseY() const;
         CursorMode getCursorMode() const;
 
         bool isClosed() const;
         bool isRunning() const;
-        bool isMinimized() const;
         bool isMaximized() const;
+        bool isMinimized() const;
         bool isFocused() const;
+        bool isFullscreen() const;
 
-        bool isKeyModifierPressed(KeyMod mod) const;
-
+        bool isKeyModPressed(KeyMod mod) const;
         bool isKeyDown(KeyCode key) const;
         bool isKeyUp(KeyCode key) const;
-
         bool isMouseButtonDown(MouseButton button) const;
         bool isMouseButtonUp(MouseButton button) const;
 
@@ -63,13 +68,13 @@ namespace Yulduz {
 
        private:
         GLFWwindow *m_Window;
-        EventDispatcher *m_Dispatcher;
-        bool m_QuitOnEscape;
+        std::optional<std::reference_wrapper<EventDispatcher>> m_Dispatcher;
+        uint32_t m_PrevWidth;
+        uint32_t m_PrevHeight;
 
         KeyMod m_KeyMods;
-
-        bool m_Keys[GLFW_KEY_LAST+1]{false};
-        bool m_MouseButtons[GLFW_KEY_LAST+1]{false};
+        bool m_Keys[GLFW_KEY_LAST + 1]{false};
+        bool m_MouseButtons[GLFW_MOUSE_BUTTON_LAST + 1]{false};
 
        private:
         void closeCallback(const WindowCloseEvent &event);
@@ -77,8 +82,8 @@ namespace Yulduz {
         void moveCallback(const WindowMoveEvent &event);
         void contentScaleCallback(const WindowContentScaleEvent &event);
         void mouseMoveCallback(const WindowMouseMoveEvent &event);
-        void minimizeCallback(const WindowMinimizeEvent &event);
         void maximizeCallback(const WindowMaximizeEvent &event);
+        void minimizeCallback(const WindowMinimizeEvent &event);
         void gainFocusCallback(const WindowGainFocusEvent &event);
         void loseFocusCallback(const WindowLoseFocusEvent &event);
         void keyCallback(const WindowKeyEvent &event);
@@ -90,8 +95,8 @@ namespace Yulduz {
         static void GlfwWindowSizeCallback(GLFWwindow *window, int width, int height);
         static void GlfwWindowContentScaleCallback(GLFWwindow *window, float xScale, float yScale);
         static void GlfwWindowPositionCallback(GLFWwindow *window, int x, int y);
-        static void GlfwWindowMinimizeCallback(GLFWwindow *window, int isMinimized);
         static void GlfwWindowMaximizeCallback(GLFWwindow *window, int isMaximized);
+        static void GlfwWindowMinimizeCallback(GLFWwindow *window, int isMinimized);
         static void GlfwWindowFocusCallback(GLFWwindow *window, int focused);
         static void GlfwWindowKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
         static void GlfwWindowCharCallback(GLFWwindow *window, unsigned int codepoint);

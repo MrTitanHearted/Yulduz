@@ -30,7 +30,7 @@ namespace Yulduz {
         "INFO",
     };
 
-    void printLog(LogLevel level, const std::string &function, const std::string &message) {
+    void printLog(LogLevel level, const std::string &function, size_t line, const std::string &message) {
 #if defined(YULDUZ_PLATFORM_WINDOWS)
         int32_t color = 0;
         switch (level) {
@@ -52,7 +52,7 @@ namespace Yulduz {
         }
         HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
         SetConsoleTextAttribute(hConsole, color);
-        std::cout << makeLogStr(level, function, message) << std::endl;
+        std::cout << makeLogStr(level, function, line, message) << std::endl;
         SetConsoleTextAttribute(hConsole, YULDUZ_TEXT_COLOR_RESET);
 #elif defined(YULDUZ_PLATFORM_UNIX)
         std::string color;
@@ -75,18 +75,19 @@ namespace Yulduz {
         }
 
         std::cout << color
-                  << makeLogStr(level, function, message) << std::endl
+                  << makeLogStr(level, function, line, message) << std::endl
                   << YULDUZ_TEXT_COLOR_RESET;
 #else
 #error Not supported platform
 #endif
     }
 
-    std::string makeLogStr(LogLevel level, const std::string &function, const std::string &message) {
-        return std::vformat("[{}]::[{}]::[{}]: {}",
+    std::string makeLogStr(LogLevel level, const std::string &function, size_t line, const std::string &message) {
+        return std::vformat("[{}]::[{}]::[{}:{}]: {}",
                             std::make_format_args(Timer::GetCurrentTimeStr(),
                                                   LogLevelStrs[level],
                                                   function,
+                                                  line,
                                                   message));
     }
 

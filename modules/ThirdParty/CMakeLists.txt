@@ -32,6 +32,6 @@ target_link_libraries(YulduzThirdParty PUBLIC
     EnTT::EnTT
 )
 
-if(NOT CMAKE_BUILD_TYPE MATCHES Release)
+if(WIN32)
     target_link_libraries(YulduzThirdParty PUBLIC Dwmapi)
 endif()

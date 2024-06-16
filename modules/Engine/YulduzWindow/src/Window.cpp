@@ -5,41 +5,52 @@
 #endif
 
 namespace Yulduz {
-    std::shared_ptr<Window> Window::New(Settings settings) {
-        if (!glfwInit()) return nullptr;
+    void Window::InitializeGlfw() {
+        if (glfwInit() == GLFW_FALSE) {
+            YZERROR("Failed to initialize GLFW!");
+            throw std::runtime_error("Failed to initialize GLFW!");
+        }
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, settings.resizable ? GLFW_TRUE : GLFW_FALSE);
+    }
 
-        GLFWwindow *window = nullptr;
-        if (settings.fullscreen && settings.fullscreenSize) {
-            GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-            const GLFWvidmode *vidmode = glfwGetVideoMode(monitor);
-            window = glfwCreateWindow(vidmode->width, vidmode->height, settings.name.c_str(), monitor, nullptr);
-        } else {
-            window = glfwCreateWindow(settings.width, settings.height, settings.name.c_str(), nullptr, nullptr);
-        }
-
-        std::shared_ptr<Window> yzWindow = std::make_shared<Window>(window);
-
-        yzWindow->setQuitOnEscape(settings.quitOnEscape);
-
-        if (settings.eventDispatcher != nullptr) {
-            yzWindow->registerCallbacks(*settings.eventDispatcher);
-        }
-
-        return yzWindow;
+    void Window::ShutdownGlfw() {
+        glfwTerminate();
     }
 
     void Window::PollEvents() {
         glfwPollEvents();
     }
 
+    std::shared_ptr<Window> Window::New(Settings settings) {
+        glfwWindowHint(GLFW_RESIZABLE, settings.resizable ? GLFW_TRUE : GLFW_FALSE);
+
+        GLFWmonitor *monitor = settings.fullscreen ? glfwGetPrimaryMonitor() : nullptr;
+        if (settings.fullscreen && settings.fullscreenSize) {
+            const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+            settings.width = mode->width;
+            settings.height = mode->height;
+        }
+
+        GLFWwindow *window = glfwCreateWindow(settings.width, settings.height, settings.title.c_str(), monitor, nullptr);
+
+        glfwShowWindow(window);
+
+        std::shared_ptr<Window> yzWindow = std::make_shared<Window>(window);
+        if (settings.eventDispatcher) {
+            yzWindow->registerCallbacks(settings.eventDispatcher.value());
+        }
+
+        return yzWindow;
+    }
+
     Window::Window(GLFWwindow *window) {
         YZDEBUG("Initializing Window: '{}'", glfwGetWindowTitle(window));
 
         m_Window = window;
-        m_Dispatcher = nullptr;
+        m_Dispatcher = std::nullopt;
+        m_PrevWidth = 0;
+        m_PrevHeight = 0;
 
         glfwSetWindowUserPointer(m_Window, this);
         glfwSetWindowCloseCallback(m_Window, GlfwWindowCloseCallback);
@@ -47,8 +58,8 @@ namespace Yulduz {
         glfwSetWindowPosCallback(m_Window, GlfwWindowPositionCallback);
         glfwSetWindowContentScaleCallback(m_Window, GlfwWindowContentScaleCallback);
         glfwSetWindowPosCallback(m_Window, GlfwWindowPositionCallback);
-        glfwSetWindowIconifyCallback(m_Window, GlfwWindowMinimizeCallback);
         glfwSetWindowMaximizeCallback(m_Window, GlfwWindowMaximizeCallback);
+        glfwSetWindowIconifyCallback(m_Window, GlfwWindowMinimizeCallback);
         glfwSetWindowFocusCallback(m_Window, GlfwWindowFocusCallback);
         glfwSetKeyCallback(m_Window, GlfwWindowKeyCallback);
         glfwSetCharCallback(m_Window, GlfwWindowCharCallback);
@@ -66,6 +77,7 @@ namespace Yulduz {
         }
 #endif
 
+        m_KeyMods = KeyMod::NONE;
         std::fill(std::begin(m_Keys), std::end(m_Keys), false);
         std::fill(std::begin(m_MouseButtons), std::end(m_MouseButtons), false);
     }
@@ -74,19 +86,20 @@ namespace Yulduz {
         YZDEBUG("Releasing Window: '{}'", glfwGetWindowTitle(m_Window));
 
         glfwDestroyWindow(m_Window);
-        glfwTerminate();
     }
 
     void Window::registerCallbacks(EventDispatcher &dispatcher) {
-        m_Dispatcher = &dispatcher;
+        if (m_Dispatcher) return;
+
+        m_Dispatcher = dispatcher;
 
         dispatcher.addCallback<WindowCloseEvent>(std::bind(&Window::closeCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowResizeEvent>(std::bind(&Window::resizeCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowMoveEvent>(std::bind(&Window::moveCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowContentScaleEvent>(std::bind(&Window::contentScaleCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowMouseMoveEvent>(std::bind(&Window::mouseMoveCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowMinimizeEvent>(std::bind(&Window::minimizeCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowMaximizeEvent>(std::bind(&Window::maximizeCallback, this, std::placeholders::_1));
+        dispatcher.addCallback<WindowMinimizeEvent>(std::bind(&Window::minimizeCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowGainFocusEvent>(std::bind(&Window::gainFocusCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowLoseFocusEvent>(std::bind(&Window::loseFocusCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowKeyEvent>(std::bind(&Window::keyCallback, this, std::placeholders::_1));
@@ -100,27 +113,49 @@ namespace Yulduz {
     }
 
     void Window::setCursorMode(CursorMode mode) {
-        glfwSetInputMode(m_Window, GLFW_CURSOR, (int)mode);
-    }
-
-    void Window::minimize() {
-        glfwIconifyWindow(m_Window);
+        glfwSetInputMode(m_Window, GLFW_CURSOR, static_cast<int>(mode));
     }
 
     void Window::maximize() {
         glfwMaximizeWindow(m_Window);
     }
 
+    void Window::minimize() {
+        glfwIconifyWindow(m_Window);
+    }
+
     void Window::restore() {
         glfwRestoreWindow(m_Window);
+    }
+
+    void Window::makeFullscreen(bool screenSize) {
+        auto [width, height] = getSize();
+        m_PrevWidth = width;
+        m_PrevHeight = height;
+
+        GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+        if (screenSize) {
+            width = mode->width;
+            height = mode->height;
+        }
+        glfwSetWindowMonitor(m_Window, monitor, 0, 0, width, height, mode->refreshRate);
+    }
+
+    void Window::makeWindowed() {
+        GLFWmonitor *monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+        uint32_t x = mode->width / 2 - m_PrevWidth / 2;
+        uint32_t y = mode->height / 2 - m_PrevHeight / 2;
+        glfwSetWindowMonitor(m_Window, nullptr, x, y, m_PrevWidth, m_PrevHeight, mode->refreshRate);
     }
 
     void Window::close() {
         glfwSetWindowShouldClose(m_Window, GLFW_TRUE);
     }
 
-    void Window::setQuitOnEscape(bool quitOnEscape) {
-        m_QuitOnEscape = quitOnEscape;
+    GLFWwindow *Window::get() const {
+        return m_Window;
     }
 
     std::string Window::getTitle() const {
@@ -136,13 +171,13 @@ namespace Yulduz {
     uint32_t Window::getWidth() const {
         int width;
         glfwGetWindowSize(m_Window, &width, nullptr);
-        return width;
+        return static_cast<uint32_t>(width);
     }
 
     uint32_t Window::getHeight() const {
         int height;
         glfwGetWindowSize(m_Window, nullptr, &height);
-        return height;
+        return static_cast<uint32_t>(height);
     }
 
     std::array<double, 2> Window::getMousePosition() const {
@@ -151,13 +186,13 @@ namespace Yulduz {
         return {x, y};
     }
 
-    double Window::getMouseX() const {
+    uint32_t Window::getMouseX() const {
         double x;
         glfwGetCursorPos(m_Window, &x, nullptr);
         return x;
     }
 
-    double Window::getMouseY() const {
+    uint32_t Window::getMouseY() const {
         double y;
         glfwGetCursorPos(m_Window, nullptr, &y);
         return y;
@@ -175,19 +210,23 @@ namespace Yulduz {
         return glfwWindowShouldClose(m_Window) == GLFW_FALSE;
     }
 
-    bool Window::isMinimized() const {
-        return glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED) == GLFW_TRUE;
-    }
-
     bool Window::isMaximized() const {
         return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED) == GLFW_TRUE;
+    }
+
+    bool Window::isMinimized() const {
+        return glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED) == GLFW_TRUE;
     }
 
     bool Window::isFocused() const {
         return glfwGetWindowAttrib(m_Window, GLFW_FOCUSED) == GLFW_TRUE;
     }
 
-    bool Window::isKeyModifierPressed(KeyMod mod) const {
+    bool Window::isFullscreen() const {
+        return glfwGetWindowMonitor(m_Window) != nullptr;
+    }
+
+    bool Window::isKeyModPressed(KeyMod mod) const {
         return static_cast<int>(m_KeyMods & mod);
     }
 

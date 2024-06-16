@@ -8,13 +8,12 @@ namespace Yulduz {
 
     class WindowEvent : public IEvent {
        public:
-        const Window *window;
+        Window *window;
     };
 
     class WindowCloseEvent : public WindowEvent {
        public:
-        WindowCloseEvent() = default;
-        WindowCloseEvent(const Window *window) {
+        WindowCloseEvent(Window *window) {
             this->window = window;
         }
     };
@@ -24,8 +23,7 @@ namespace Yulduz {
         uint32_t width;
         uint32_t height;
 
-        WindowResizeEvent() = default;
-        WindowResizeEvent(const Window *window, uint32_t width, uint32_t height)
+        WindowResizeEvent(Window *window, uint32_t width, uint32_t height)
             : width(width), height(height) {
             this->window = window;
         }
@@ -36,8 +34,7 @@ namespace Yulduz {
         float xScale;
         float yScale;
 
-        WindowContentScaleEvent() = default;
-        WindowContentScaleEvent(const Window *window, float xScale, float yScale)
+        WindowContentScaleEvent(Window *window, float xScale, float yScale)
             : xScale(xScale), yScale(yScale) {
             this->window = window;
         }
@@ -48,48 +45,42 @@ namespace Yulduz {
         uint32_t x;
         uint32_t y;
 
-        WindowMoveEvent() = default;
-        WindowMoveEvent(const Window *window, uint32_t x, uint32_t y) : x(x), y(y) {
+        WindowMoveEvent(Window *window, uint32_t x, uint32_t y) : x(x), y(y) {
             this->window = window;
         }
     };
 
     class WindowRestoreEvent : public WindowEvent {
        public:
-        WindowRestoreEvent() = default;
-        WindowRestoreEvent(const Window *window) {
+        WindowRestoreEvent(Window *window) {
             this->window = window;
         }
     };
 
     class WindowMinimizeEvent : public WindowEvent {
        public:
-        WindowMinimizeEvent() = default;
-        WindowMinimizeEvent(const Window *window) {
+        WindowMinimizeEvent(Window *window) {
             this->window = window;
         }
     };
 
     class WindowMaximizeEvent : public WindowEvent {
        public:
-        WindowMaximizeEvent() = default;
-        WindowMaximizeEvent(const Window *window) {
+        WindowMaximizeEvent(Window *window) {
             this->window = window;
         }
     };
 
     class WindowGainFocusEvent : public WindowEvent {
        public:
-        WindowGainFocusEvent() = default;
-        WindowGainFocusEvent(const Window *window) {
+        WindowGainFocusEvent(Window *window) {
             this->window = window;
         }
     };
 
     class WindowLoseFocusEvent : public WindowEvent {
        public:
-        WindowLoseFocusEvent() = default;
-        WindowLoseFocusEvent(const Window *window) {
+        WindowLoseFocusEvent(Window *window) {
             this->window = window;
         }
     };
@@ -98,10 +89,9 @@ namespace Yulduz {
        public:
         KeyCode key;
         KeyMod mods;
-        Action action;
+        KeyAction action;
 
-        WindowKeyEvent() = default;
-        WindowKeyEvent(const Window *window, KeyCode key, KeyMod mods, Action action)
+        WindowKeyEvent(Window *window, KeyCode key, KeyMod mods, KeyAction action)
             : key(key), mods(mods), action(action) {
             this->window = window;
         }
@@ -111,8 +101,7 @@ namespace Yulduz {
        public:
         uint32_t codepoint;
 
-        WindowCharEvent() = default;
-        WindowCharEvent(const Window *window, uint32_t codepoint) : codepoint(codepoint) {
+        WindowCharEvent(Window *window, uint32_t codepoint) : codepoint(codepoint) {
             this->window = window;
         }
     };
@@ -122,24 +111,21 @@ namespace Yulduz {
         double x;
         double y;
 
-        WindowMouseMoveEvent() = default;
-        WindowMouseMoveEvent(const Window *window, double x, double y) : x(x), y(y) {
+        WindowMouseMoveEvent(Window *window, double x, double y) : x(x), y(y) {
             this->window = window;
         }
     };
 
     class WindowMouseEnterEvent : public WindowEvent {
        public:
-        WindowMouseEnterEvent() = default;
-        WindowMouseEnterEvent(const Window *window) {
+        WindowMouseEnterEvent(Window *window) {
             this->window = window;
         }
     };
 
     class WindowMouseLeaveEvent : public WindowEvent {
        public:
-        WindowMouseLeaveEvent() = default;
-        WindowMouseLeaveEvent(const Window *window) {
+        WindowMouseLeaveEvent(Window *window) {
             this->window = window;
         }
     };
@@ -148,10 +134,9 @@ namespace Yulduz {
        public:
         MouseButton button;
         KeyMod mods;
-        Action action;
+        KeyAction action;
 
-        WindowMouseButtonEvent() = default;
-        WindowMouseButtonEvent(const Window *window, MouseButton button, KeyMod mods, Action action)
+        WindowMouseButtonEvent(Window *window, MouseButton button, KeyMod mods, KeyAction action)
             : button(button), mods(mods), action(action) {
             this->window = window;
         }
@@ -162,8 +147,7 @@ namespace Yulduz {
         double xOffset;
         double yOffset;
 
-        WindowMouseScrollEvent() = default;
-        WindowMouseScrollEvent(const Window *window, double x, double y) : xOffset(x), yOffset(y) {
+        WindowMouseScrollEvent(Window *window, double x, double y) : xOffset(x), yOffset(y) {
             this->window = window;
         }
     };

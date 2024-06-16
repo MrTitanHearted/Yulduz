@@ -24,15 +24,12 @@ namespace Yulduz {
         uint32_t getChannelCount() const;
         uint32_t getStride() const;
 
-        inline const void *operator*() const { return m_Data.get(); }
-        inline operator const void *() const { return m_Data.get(); }
-
        private:
         std::string m_Name;
         std::string m_Path;
         std::string m_Directory;
         std::string m_Extension;
-        std::unique_ptr<uint8_t> m_Data;
+        void *m_Data;
         size_t m_Size;
         uint32_t m_Width;
         uint32_t m_Height;

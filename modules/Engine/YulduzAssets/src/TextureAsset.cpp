@@ -8,7 +8,7 @@ namespace Yulduz {
         YZDEBUG("Initializing Texture Asset: '{}'", path);
 
         m_Path = path;
-        m_Data = std::unique_ptr<uint8_t>((uint8_t *)data);
+        m_Data = data;
         m_Size = size;
         m_Width = width;
         m_Height = height;
@@ -23,6 +23,8 @@ namespace Yulduz {
 
     TextureAsset::~TextureAsset() {
         YZDEBUG("Releasing Texture Asset: '{}'", m_Path);
+
+        stbi_image_free(m_Data);
     }
 
     std::string TextureAsset::getName() const {
@@ -42,7 +44,7 @@ namespace Yulduz {
     }
 
     const void *TextureAsset::getData() const {
-        return m_Data.get();
+        return m_Data;
     }
 
     size_t TextureAsset::getSize() const {
@@ -65,12 +67,6 @@ namespace Yulduz {
         return m_Stride;
     }
 
-    void releaseTexture(TextureAsset *asset) {
-        if (asset == nullptr) return;
-        stbi_image_free((void *)asset->getData());
-        delete asset;
-    }
-    
     std::optional<std::shared_ptr<TextureAsset>> TextureAsset::FromData(const std::string &path, const void *data, size_t size, bool flipVertically) {
         if (flipVertically) {
             stbi_set_flip_vertically_on_load(1);
@@ -87,7 +83,7 @@ namespace Yulduz {
             stbi_set_flip_vertically_on_load(0);
         }
 
-        return std::shared_ptr<TextureAsset>(new TextureAsset(path, textureData, width * height * 4, width, height, 4, width * 4), releaseTexture);
+        return std::make_shared<TextureAsset>(path, textureData, width * height * 4, width, height, 4, width * 4);
     }
 
     std::optional<std::shared_ptr<TextureAsset>> TextureAsset::FromPath(const std::string &path, bool flipVertically) {
@@ -111,6 +107,6 @@ namespace Yulduz {
             stbi_set_flip_vertically_on_load(0);
         }
 
-        return std::shared_ptr<TextureAsset>(new TextureAsset(path, data, width * height * 4, width, height, 4, width * 4), releaseTexture);
+        return std::make_shared<TextureAsset>(path, data, width * height * 4, width, height, 4, width * 4);
     }
 }  // namespace Yulduz
