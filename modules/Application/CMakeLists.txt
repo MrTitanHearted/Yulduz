@@ -15,5 +15,3 @@ endif()
 target_include_directories(Yulduz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries(Yulduz PRIVATE Yulduz::Engine)
-
-target_precompile_headers(Yulduz REUSE_FROM YulduzCore)

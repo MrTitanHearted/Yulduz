@@ -32,18 +32,20 @@ namespace Yulduz {
         template <typename Event, typename = std::enable_if_t<std::is_base_of<IEvent, Event>::value>>
         std::vector<std::function<void(const IEvent *)>> getRawCallbacks() const {
             const std::type_info &eventType = typeid(Event);
-            return m_CallbacksMap[eventType.hash_code()];
+            if (m_CallbacksMap.find(eventType.hash_code()) == m_CallbacksMap.end()) return std::vector<std::function<void(const IEvent *)>>();
+            return m_CallbacksMap.at(eventType.hash_code());
         }
 
         template <typename Event, typename = std::enable_if_t<std::is_base_of<IEvent, Event>::value>>
         std::vector<std::function<void(const Event &)>> getCallbacks() const {
             const std::type_info &eventType = typeid(Event);
-            const CallbackVector &callbacks = m_CallbacksMap[eventType.hash_code()];
+            if (m_CallbacksMap.find(eventType.hash_code()) == m_CallbacksMap.end()) return std::vector<std::function<void(const Event &)>>();
+            const CallbackVector &callbacks = m_CallbacksMap.at(eventType.hash_code());
             std::vector<std::function<void(const Event &)>> result(callbacks.size());
             std::transform(callbacks.begin(), callbacks.end(), result.begin(),
                            [](Callback callback) {
                                return [callback](const Event &event) {
-                                   callback(*dynamic_cast<const IEvent *>(&event));
+                                   callback(dynamic_cast<const IEvent *>(&event));
                                };
                            });
             return result;
