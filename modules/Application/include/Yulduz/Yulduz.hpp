@@ -16,17 +16,13 @@ namespace Yulduz {
         std::shared_ptr<RenderContext> m_Context;
         std::shared_ptr<Framebuffer> m_ContextDepthBuffer;
 
-        ImFont *m_Font;
-
-        std::shared_ptr<RenderBundle> m_RenderBundle;
-
         std::shared_ptr<Framebuffer> m_Depthbuffer;
         std::shared_ptr<Framebuffer> m_Framebuffer;
+        std::vector<std::uint32_t> m_Framedata;
 
-        CameraManager m_Camera;
+        ImFont *m_Font;
 
-        std::shared_ptr<UniformBuffer> m_ProjectionUniform;
-        std::shared_ptr<UniformBuffer> m_ViewUniform;
+        bool m_Render;
 
        private:
         App();
@@ -35,11 +31,10 @@ namespace Yulduz {
         void run();
         void renderFrame(const std::shared_ptr<Framebuffer> &frame);
         void renderImGui();
+        
+        void updateFramedata();
 
         void keyCallback(const WindowKeyEvent &event);
-        void mouseButtonCallback(const WindowMouseButtonEvent &event);
         void resizeCallback(const WindowResizeEvent &event);
-        void mouseMoveCallback(const WindowMouseMoveEvent &event);
-        void mouseScrollCallback(const WindowMouseScrollEvent &event);
     };
 }  // namespace Yulduz

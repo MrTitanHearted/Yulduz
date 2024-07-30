@@ -43,6 +43,6 @@ rem wgpu-cmake
 
 rem dependencies
 
-call vcpkg install glfw3 glm stb assimp gamenetworkingsockets --triplet=x64-windows
+call vcpkg install glfw3 glm stb --triplet=x64-windows
 
 rem dependencies

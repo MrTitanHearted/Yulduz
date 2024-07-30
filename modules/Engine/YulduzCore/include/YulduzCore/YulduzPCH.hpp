@@ -38,10 +38,6 @@ namespace fs = std::filesystem;
 
 #include <GLFW/glfw3.h>
 
-#include <assimp/cimport.h>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-
 #include <wgpu/wgpu_impl_glfw.h>
 #include <wgpu/wgpu.h>
 

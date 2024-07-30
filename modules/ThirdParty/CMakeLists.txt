@@ -9,8 +9,6 @@ project(YulduzThirdParty)
 find_package(wgpu CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
-find_package(assimp CONFIG REQUIRED)
-find_package(GameNetworkingSockets CONFIG REQUIRED)
 find_package(Stb REQUIRED)
 
 file(GLOB_RECURSE SOURCES
@@ -31,8 +29,6 @@ target_link_libraries(YulduzThirdParty PUBLIC
     wgpu::wgpu
     glm::glm-header-only
     glfw
-    assimp::assimp
-    GameNetworkingSockets::static
 )
 
 if(WIN32)
