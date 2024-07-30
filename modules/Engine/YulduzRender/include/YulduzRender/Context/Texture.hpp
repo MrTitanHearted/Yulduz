@@ -7,7 +7,7 @@
 namespace Yulduz {
     class RenderContext;
 
-    class Texture {
+    class Texture : std::enable_shared_from_this<Texture> {
        public:
         Texture(const std::string &label, const WGPUTexture &texture);
         ~Texture();
@@ -24,6 +24,9 @@ namespace Yulduz {
         std::uint32_t getWidth() const;
         std::uint32_t getHeight() const;
         std::uint32_t getDepthOrArrayLayers() const;
+        std::uint32_t getFormatSize() const;
+
+        static std::uint32_t FormatSize(TextureFormat format);
 
        private:
         std::string m_Label;

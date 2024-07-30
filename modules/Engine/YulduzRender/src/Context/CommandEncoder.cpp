@@ -12,6 +12,21 @@ namespace Yulduz {
         };
     }
 
+    void ImageCopyTexture::write(const void *data, const std::shared_ptr<RenderContext> &context) const {
+        WGPUTextureDataLayout dataLayout{
+            .offset = 0,
+            .bytesPerRow = m_Texture->getWidth() * Texture::FormatSize(m_Texture->getFormat()),
+            .rowsPerImage = m_Texture->getHeight(),
+        };
+        WGPUExtent3D writeSize{
+            .width = m_Texture->getWidth(),
+            .height = m_Texture->getHeight(),
+            .depthOrArrayLayers = m_Texture->getDepthOrArrayLayers(),
+        };
+
+        wgpuQueueWriteTexture(context->getQueue(), &m_ImageCopyTexture, data, m_Texture->getWidth() * m_Texture->getHeight() * m_Texture->getDepthOrArrayLayers() * Texture::FormatSize(m_Texture->getFormat()), &dataLayout, &writeSize);
+    }
+
     ImageCopyTexture &ImageCopyTexture::setMipLevel(std::uint32_t mipLevel) {
         m_ImageCopyTexture.mipLevel = mipLevel;
         return *this;

@@ -68,6 +68,10 @@ namespace Yulduz {
         return wgpuTextureGetDepthOrArrayLayers(m_Texture);
     }
 
+    std::uint32_t Texture::getFormatSize() const {
+        return FormatSize(getFormat());
+    }
+
     Framebuffer::Framebuffer(const std::string &label, const WGPUTexture &texture) {
         YZINFO("Initializing Framebuffer: '{}'", label);
 
@@ -195,5 +199,114 @@ namespace Yulduz {
         WGPUTexture texture = wgpuDeviceCreateTexture(context->getDevice(), &m_Descriptor);
 
         return std::make_shared<Texture>(m_Label, texture);
+    }
+
+    std::uint32_t Texture::FormatSize(TextureFormat format) {
+        static const std::unordered_map<TextureFormat, size_t> formatSizes = {
+            {TextureFormat::Undefined, 0},
+            {TextureFormat::R8Unorm, 1},
+            {TextureFormat::R8Snorm, 1},
+            {TextureFormat::R8Uint, 1},
+            {TextureFormat::R8Sint, 1},
+            {TextureFormat::R16Uint, 2},
+            {TextureFormat::R16Sint, 2},
+            {TextureFormat::R16Float, 2},
+            {TextureFormat::RG8Unorm, 2},
+            {TextureFormat::RG8Snorm, 2},
+            {TextureFormat::RG8Uint, 2},
+            {TextureFormat::RG8Sint, 2},
+            {TextureFormat::R32Float, 4},
+            {TextureFormat::R32Uint, 4},
+            {TextureFormat::R32Sint, 4},
+            {TextureFormat::RG16Uint, 4},
+            {TextureFormat::RG16Sint, 4},
+            {TextureFormat::RG16Float, 4},
+            {TextureFormat::RGBA8Unorm, 4},
+            {TextureFormat::RGBA8UnormSrgb, 4},
+            {TextureFormat::RGBA8Snorm, 4},
+            {TextureFormat::RGBA8Uint, 4},
+            {TextureFormat::RGBA8Sint, 4},
+            {TextureFormat::BGRA8Unorm, 4},
+            {TextureFormat::BGRA8UnormSrgb, 4},
+            {TextureFormat::RGB10A2Uint, 4},
+            {TextureFormat::RGB10A2Unorm, 4},
+            {TextureFormat::RG11B10Ufloat, 4},
+            {TextureFormat::RGB9E5Ufloat, 4},
+            {TextureFormat::RG32Float, 8},
+            {TextureFormat::RG32Uint, 8},
+            {TextureFormat::RG32Sint, 8},
+            {TextureFormat::RGBA16Uint, 8},
+            {TextureFormat::RGBA16Sint, 8},
+            {TextureFormat::RGBA16Float, 8},
+            {TextureFormat::RGBA32Float, 16},
+            {TextureFormat::RGBA32Uint, 16},
+            {TextureFormat::RGBA32Sint, 16},
+            {TextureFormat::Stencil8, 1},
+            {TextureFormat::Depth16Unorm, 2},
+            {TextureFormat::Depth24Plus, 3},  // Approximate size
+            {TextureFormat::Depth24PlusStencil8, 4},
+            {TextureFormat::Depth32Float, 4},
+            {TextureFormat::Depth32FloatStencil8, 5},  // Approximate size
+            {TextureFormat::BC1RGBAUnorm, 8},          // Approximate size per 4x4 block
+            {TextureFormat::BC1RGBAUnormSrgb, 8},
+            {TextureFormat::BC2RGBAUnorm, 16},
+            {TextureFormat::BC2RGBAUnormSrgb, 16},
+            {TextureFormat::BC3RGBAUnorm, 16},
+            {TextureFormat::BC3RGBAUnormSrgb, 16},
+            {TextureFormat::BC4RUnorm, 8},
+            {TextureFormat::BC4RSnorm, 8},
+            {TextureFormat::BC5RGUnorm, 16},
+            {TextureFormat::BC5RGSnorm, 16},
+            {TextureFormat::BC6HRGBUfloat, 16},
+            {TextureFormat::BC6HRGBFloat, 16},
+            {TextureFormat::BC7RGBAUnorm, 16},
+            {TextureFormat::BC7RGBAUnormSrgb, 16},
+            {TextureFormat::ETC2RGB8Unorm, 8},
+            {TextureFormat::ETC2RGB8UnormSrgb, 8},
+            {TextureFormat::ETC2RGB8A1Unorm, 8},
+            {TextureFormat::ETC2RGB8A1UnormSrgb, 8},
+            {TextureFormat::ETC2RGBA8Unorm, 16},
+            {TextureFormat::ETC2RGBA8UnormSrgb, 16},
+            {TextureFormat::EACR11Unorm, 8},
+            {TextureFormat::EACR11Snorm, 8},
+            {TextureFormat::EACRG11Unorm, 16},
+            {TextureFormat::EACRG11Snorm, 16},
+            {TextureFormat::ASTC4x4Unorm, 16},
+            {TextureFormat::ASTC4x4UnormSrgb, 16},
+            {TextureFormat::ASTC5x4Unorm, 16},
+            {TextureFormat::ASTC5x4UnormSrgb, 16},
+            {TextureFormat::ASTC5x5Unorm, 16},
+            {TextureFormat::ASTC5x5UnormSrgb, 16},
+            {TextureFormat::ASTC6x5Unorm, 16},
+            {TextureFormat::ASTC6x5UnormSrgb, 16},
+            {TextureFormat::ASTC6x6Unorm, 16},
+            {TextureFormat::ASTC6x6UnormSrgb, 16},
+            {TextureFormat::ASTC8x5Unorm, 16},
+            {TextureFormat::ASTC8x5UnormSrgb, 16},
+            {TextureFormat::ASTC8x6Unorm, 16},
+            {TextureFormat::ASTC8x6UnormSrgb, 16},
+            {TextureFormat::ASTC8x8Unorm, 16},
+            {TextureFormat::ASTC8x8UnormSrgb, 16},
+            {TextureFormat::ASTC10x5Unorm, 16},
+            {TextureFormat::ASTC10x5UnormSrgb, 16},
+            {TextureFormat::ASTC10x6Unorm, 16},
+            {TextureFormat::ASTC10x6UnormSrgb, 16},
+            {TextureFormat::ASTC10x8Unorm, 16},
+            {TextureFormat::ASTC10x8UnormSrgb, 16},
+            {TextureFormat::ASTC10x10Unorm, 16},
+            {TextureFormat::ASTC10x10UnormSrgb, 16},
+            {TextureFormat::ASTC12x10Unorm, 16},
+            {TextureFormat::ASTC12x10UnormSrgb, 16},
+            {TextureFormat::ASTC12x12Unorm, 16},
+            {TextureFormat::ASTC12x12UnormSrgb, 16},
+            {TextureFormat::Force32, 4},
+        };
+
+        auto it = formatSizes.find(format);
+        if (it != formatSizes.end()) {
+            return it->second;
+        } else {
+            return 0;
+        }
     }
 }  // namespace Yulduz

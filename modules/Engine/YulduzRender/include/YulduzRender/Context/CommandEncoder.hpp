@@ -14,6 +14,10 @@ namespace Yulduz {
         ImageCopyTexture(const std::shared_ptr<Texture> &texture);
         ~ImageCopyTexture() = default;
 
+        inline static ImageCopyTexture New(const std::shared_ptr<Texture> &texture) { return ImageCopyTexture(texture); }
+
+        void write(const void *data, const std::shared_ptr<RenderContext> &context) const;
+
         ImageCopyTexture &setMipLevel(std::uint32_t mipLevel);
         ImageCopyTexture &setOrigin3D(std::uint32_t x, std::uint32_t y, std::uint32_t z);
         ImageCopyTexture &setAspect(TextureAspect aspect);
@@ -25,7 +29,7 @@ namespace Yulduz {
         std::shared_ptr<Texture> m_Texture;
         WGPUImageCopyTexture m_ImageCopyTexture;
     };
-    
+
     class CommandBuffer {
        public:
         CommandBuffer(const std::string &label, const WGPUCommandBuffer &commandBuffer);
