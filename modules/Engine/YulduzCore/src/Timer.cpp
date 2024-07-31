@@ -10,7 +10,9 @@ namespace Yulduz {
     }
 
     double Timer::getElapsedSeconds() const {
-        return Duration(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return Timer::Duration(m_End.value() - m_Start.value()).count();
     }
 
     Timer::SystemTimePoint Timer::GetCurrentTimePoint() {
@@ -35,34 +37,50 @@ namespace Yulduz {
     }
 
     double Seconds::Timer::getElapsed() const {
-        return Timer::Duration(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return Timer::Duration(m_End.value() - m_Start.value()).count();
     }
 
     Seconds::Timer::operator double() const {
-        return Timer::Duration(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return Timer::Duration(m_End.value() - m_Start.value()).count();
     }
 
     double Milliseconds::Timer::getElapsed() const {
-        return std::chrono::duration<double, std::milli>(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return std::chrono::duration<double, std::milli>(m_End.value() - m_Start.value()).count();
     }
 
     Milliseconds::Timer::operator double() const {
-        return std::chrono::duration<double, std::milli>(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return std::chrono::duration<double, std::milli>(m_End.value() - m_Start.value()).count();
     }
 
     double Microseconds::Timer::getElapsed() const {
-        return std::chrono::duration<double, std::micro>(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return std::chrono::duration<double, std::micro>(m_End.value() - m_Start.value()).count();
     }
 
     Microseconds::Timer::operator double() const {
-        return std::chrono::duration<double, std::micro>(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return std::chrono::duration<double, std::micro>(m_End.value() - m_Start.value()).count();
     }
 
     double Nanoseconds::Timer::getElapsed() const {
-        return std::chrono::duration<double, std::nano>(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return std::chrono::duration<double, std::nano>(m_End.value() - m_Start.value()).count();
     }
 
     Nanoseconds::Timer::operator double() const {
-        return std::chrono::duration<double, std::nano>(m_End - m_Start).count();
+        if (!m_Start || !m_End) return 0.0f;
+
+        return std::chrono::duration<double, std::nano>(m_End.value() - m_Start.value()).count();
     }
 }  // namespace Yulduz

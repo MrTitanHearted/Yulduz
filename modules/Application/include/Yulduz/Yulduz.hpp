@@ -10,7 +10,13 @@ namespace Yulduz {
         static void Run();
 
        private:
-        Timer m_Timer;
+        double m_DeltaTime;
+        double m_EventDispatchTime;
+        double m_CameraTime;
+        double m_ImGuiTime;
+        double m_RenderTime;
+        double m_RayTracingTime;
+
         EventDispatcher m_EventDispatcher;
         AssetManager m_AssetManager;
         std::shared_ptr<Window> m_Window;
@@ -21,7 +27,6 @@ namespace Yulduz {
         RayTracedCamera m_Camera;
         Scene m_Scene;
         ImVec2 m_Viewport;
-        float m_LastRenderTime;
 
         ImFont *m_Font;
 

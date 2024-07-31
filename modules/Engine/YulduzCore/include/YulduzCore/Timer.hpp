@@ -24,8 +24,8 @@ namespace Yulduz {
         static std::string GetCurrentTimeStr();
 
        protected:
-        TimePoint m_Start;
-        TimePoint m_End;
+        std::optional<TimePoint> m_Start;
+        std::optional<TimePoint> m_End;
     };
 
     namespace Seconds {

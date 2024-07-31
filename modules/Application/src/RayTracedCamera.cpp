@@ -29,28 +29,28 @@ namespace Yulduz {
         constexpr glm::vec3 upDirection(0.0f, 1.0f, 0.0f);
         glm::vec3 rightDirection = glm::cross(m_ForwardDirection, upDirection);
 
-        float speed = 50.0f;
+        float speed = 0.005f;
 
         // Movement
         if (window->isKeyDown(KeyCode::W)) {
-            m_Position -= m_ForwardDirection * speed * ts;
+            m_Position += m_ForwardDirection * speed * ts;
             moved = true;
         } else if (window->isKeyDown(KeyCode::S)) {
-            m_Position += m_ForwardDirection * speed * ts;
+            m_Position -= m_ForwardDirection * speed * ts;
             moved = true;
         }
         if (window->isKeyDown(KeyCode::A)) {
-            m_Position += rightDirection * speed * ts;
+            m_Position -= rightDirection * speed * ts;
             moved = true;
         } else if (window->isKeyDown(KeyCode::D)) {
-            m_Position -= rightDirection * speed * ts;
+            m_Position += rightDirection * speed * ts;
             moved = true;
         }
         if (window->isKeyDown(KeyCode::Q)) {
-            m_Position += upDirection * speed * ts;
+            m_Position -= upDirection * speed * ts;
             moved = true;
         } else if (window->isKeyDown(KeyCode::E)) {
-            m_Position -= upDirection * speed * ts;
+            m_Position += upDirection * speed * ts;
             moved = true;
         }
 

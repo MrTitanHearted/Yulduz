@@ -7,7 +7,13 @@ namespace Yulduz {
     }
 
     App::App()
-        : m_Camera{45.0f, 0.1f, 100.0f} {
+        : m_Camera{45.0f, 0.1f, 100.0f},
+          m_DeltaTime{0},
+          m_EventDispatchTime{0},
+          m_CameraTime{0},
+          m_ImGuiTime{0},
+          m_RenderTime{0},
+          m_RayTracingTime{0} {
         m_Window = Window::New(Window::Settings{
             .Title = "Yulduz Cherno Raytracing",
             .Width = 1200,
@@ -15,10 +21,7 @@ namespace Yulduz {
             .EventDispatcher = m_EventDispatcher,
         });
         auto [width, height] = m_Window->getSize();
-        m_Context = RenderContextBuilder::New()
-                        .addSurfaceUsage(TextureUsage::CopySrc)
-                        .build(m_Window);
-
+        m_Context = RenderContextBuilder::New().build(m_Window);
         m_Context->registerCallbacks(m_EventDispatcher);
         m_EventDispatcher.addCallback<WindowKeyEvent>(std::bind(&App::keyCallback, this, std::placeholders::_1));
         m_EventDispatcher.addCallback<WindowResizeEvent>(std::bind(&App::resizeCallback, this, std::placeholders::_1));
@@ -30,17 +33,15 @@ namespace Yulduz {
                             .setLabel("ImGui Depthbuffer")
                             .setFormat(TextureFormat::Depth32Float)
                             .emptyFramebuffer(width, height, m_Context);
-
-        m_LastRenderTime = 0.0f;
         m_Renderer.setRenderContext(m_Context);
         m_Scene.Spheres.emplace_back(Sphere{
-            .Position = glm::vec3{0.0f}, 
-            .Radius = 0.5f, 
+            .Position = glm::vec3{0.0f},
+            .Radius = 0.5f,
             .Albedo = glm::vec3{1.0f, 0.0f, 1.0f},
         });
         m_Scene.Spheres.emplace_back(Sphere{
-            .Position = glm::vec3{1.0f,0.0f,-5.0f}, 
-            .Radius = 1.5f, 
+            .Position = glm::vec3{1.0f, 0.0f, -5.0f},
+            .Radius = 1.5f,
             .Albedo = glm::vec3{0.2f, 0.3f, 1.0f},
         });
     }
@@ -51,18 +52,37 @@ namespace Yulduz {
 
     void App::run() {
         while (m_Window->isRunning()) {
-            m_Timer.start();
+            static Milliseconds::Timer timer;
+            static Milliseconds::Timer eventTimer;
+            static Milliseconds::Timer cameraTimer;
+            static Milliseconds::Timer imguiTimer;
+            static Milliseconds::Timer renderTimer;
+            
+            timer.start();
 
+            eventTimer.start();
             Window::PollEvents();
             m_EventDispatcher.dispatch();
+            eventTimer.stop();
+            m_EventDispatchTime = eventTimer.getElapsed();
 
-            m_Camera.OnUpdate(m_Timer.getElapsedSeconds() * 1000.0f, m_Window);
+            cameraTimer.start();
+            m_Camera.OnUpdate(m_DeltaTime, m_Window);
+            cameraTimer.stop();
+            m_CameraTime = cameraTimer.getElapsed();
 
+            imguiTimer.start();
             ImGuiFrame(std::bind(&App::renderImGui, this));
+            imguiTimer.stop();
+            m_ImGuiTime = imguiTimer.getElapsed();
 
+            renderTimer.start();
             m_Context->renderFrameOnSurface(std::bind(&App::renderFrame, this, std::placeholders::_1));
+            renderTimer.stop();
+            m_RenderTime = renderTimer.getElapsed();
 
-            m_Timer.stop();
+            timer.stop();
+            m_DeltaTime = timer.getElapsed();
         }
     }
 
@@ -90,7 +110,12 @@ namespace Yulduz {
         ImGui::PushFont(m_Font);
 
         ImGui::Begin("Settings");
-        ImGui::Text("Last render: %.3fms", m_LastRenderTime);
+        ImGui::Text("Delta Time: %.3fms", m_DeltaTime);
+        ImGui::Text("Event Dispatch Time: %.3fms", m_EventDispatchTime);
+        ImGui::Text("Camera Time: %.3fms", m_CameraTime);
+        ImGui::Text("ImGui Time: %.3fms", m_ImGuiTime);
+        ImGui::Text("\tRayTracing Time: %.3fms", m_RayTracingTime);
+        ImGui::Text("Render Time: %.3fms", m_RenderTime);
         if (ImGui::Button("Render"))
             updateFramedata();
         ImGui::End();
@@ -99,7 +124,7 @@ namespace Yulduz {
         for (std::size_t i = 0; i < m_Scene.Spheres.size(); i++) {
             ImGui::PushID(i);
 
-            Sphere& sphere = m_Scene.Spheres[i];
+            Sphere &sphere = m_Scene.Spheres[i];
             ImGui::DragFloat3("Position", glm::value_ptr(sphere.Position), 0.1f);
             ImGui::DragFloat("Radius", &sphere.Radius, 0.1f);
             ImGui::ColorEdit3("Albedo", glm::value_ptr(sphere.Albedo));
@@ -121,22 +146,23 @@ namespace Yulduz {
 
         ImGui::End();
         ImGui::PopStyleVar();
+
         ImGui::PopFont();
     }
 
     void App::updateFramedata() {
         if (m_Viewport.x == 0 || m_Viewport.y == 0) return;
 
-        static Milliseconds::Timer timer;
-        timer.start();
+        static Milliseconds::Timer rayTracingTimer;
+        rayTracingTimer.start();
 
         m_Renderer.resize(m_Viewport.x, m_Viewport.y);
         m_Camera.OnResize(m_Viewport.x, m_Viewport.y);
         m_Renderer.render(m_Scene, m_Camera);
 
-        timer.stop();
+        rayTracingTimer.stop();
 
-        m_LastRenderTime = timer.getElapsedSeconds();
+        m_RayTracingTime = rayTracingTimer.getElapsedSeconds();
     }
 
     void App::keyCallback(const WindowKeyEvent &event) {
