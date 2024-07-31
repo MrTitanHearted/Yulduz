@@ -7,7 +7,7 @@ namespace Yulduz {
         return ImGuiInitialized;
     }
 
-    void InitImGui(const std::shared_ptr<RenderContext> &context) {
+    void InitImGui(const std::shared_ptr<RenderContext> &context, TextureFormat depthFormat) {
         if (ImGuiInitialized) return;
 
         IMGUI_CHECKVERSION();
@@ -23,7 +23,7 @@ namespace Yulduz {
         ImGui_ImplWGPU_InitInfo info{};
         info.Device = context->getDevice();
         info.RenderTargetFormat = context->getConfig().format;
-        info.DepthStencilFormat = WGPUTextureFormat_Depth32Float;
+        info.DepthStencilFormat = static_cast<WGPUTextureFormat>(depthFormat);
 
         ImGui_ImplGlfw_InitForOther(context->getWindow()->get(), true);
         ImGui_ImplWGPU_Init(&info);

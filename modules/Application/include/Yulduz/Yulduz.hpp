@@ -7,22 +7,19 @@ namespace Yulduz {
         static void Run();
 
        private:
-        bool m_IsInGameWindow;
-
         Timer m_Timer;
         EventDispatcher m_EventDispatcher;
         AssetManager m_AssetManager;
         std::shared_ptr<Window> m_Window;
         std::shared_ptr<RenderContext> m_Context;
-        std::shared_ptr<Framebuffer> m_ContextDepthBuffer;
-
         std::shared_ptr<Framebuffer> m_Depthbuffer;
+
         std::shared_ptr<Framebuffer> m_Framebuffer;
         std::vector<std::uint32_t> m_Framedata;
+        ImVec2 m_Viewport;
+        float m_LastRenderTime;
 
         ImFont *m_Font;
-
-        bool m_Render;
 
        private:
         App();

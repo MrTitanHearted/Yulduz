@@ -9,7 +9,7 @@
 
 namespace Yulduz {
     bool IsImGuiInitialized();
-    void InitImGui(const std::shared_ptr<RenderContext> &context);
+    void InitImGui(const std::shared_ptr<RenderContext> &context, TextureFormat depthFormat = TextureFormat::Depth32Float);
     void ImGuiFrame(std::function<void()> frameCallback);
     void RenderImGui(const std::shared_ptr<RenderPass> &renderPass);
     void ShutdownImGui();

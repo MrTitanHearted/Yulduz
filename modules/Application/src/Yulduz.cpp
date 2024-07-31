@@ -1,4 +1,15 @@
 #include <Yulduz/Yulduz.hpp>
+#include <random>
+
+namespace Random {
+    std::uint32_t Uint32() {
+        static std::random_device rd;
+        static std::mt19937 gen(rd());
+#undef max
+        static std::uniform_int_distribution<std::uint32_t> distr(0, std::numeric_limits<std::uint32_t>::max());
+        return distr(gen);
+    }
+}  // namespace Random
 
 namespace Yulduz {
     void App::Run() {
@@ -12,33 +23,23 @@ namespace Yulduz {
             .EventDispatcher = m_EventDispatcher,
         });
         auto [width, height] = m_Window->getSize();
-        m_Context =
-            RenderContextBuilder::New()
-                .addSurfaceUsage(TextureUsage::CopySrc)
-                .build(m_Window);
-        m_ContextDepthBuffer =
-            TextureBuilder::New()
-                .setLabel("Yulduz Context Depth Buffer")
-                .setFormat(TextureFormat::Depth32Float)
-                .emptyFramebuffer(width, height, m_Context);
+        m_Context = RenderContextBuilder::New()
+                        .addSurfaceUsage(TextureUsage::CopySrc)
+                        .build(m_Window);
+
         m_Context->registerCallbacks(m_EventDispatcher);
         m_EventDispatcher.addCallback<WindowKeyEvent>(std::bind(&App::keyCallback, this, std::placeholders::_1));
         m_EventDispatcher.addCallback<WindowResizeEvent>(std::bind(&App::resizeCallback, this, std::placeholders::_1));
         RenderContext::SetupWGPULogging(WebGPULogLevel::Error);
         InitImGui(m_Context);
         ImGuiIO &io = ImGui::GetIO();
-        m_Font = io.Fonts->AddFontFromFileTTF("assets/fonts/JetBrainsMonoNerdFont-Medium.ttf", 18.0f);
-
+        m_Font = io.Fonts->AddFontFromFileTTF(YULDUZ_SOURCE_DIR "/assets/fonts/JetBrainsMonoNerdFont-Medium.ttf", 18.0f);
         m_Depthbuffer = TextureBuilder::New()
-                            .setLabel("Yulduz Main Depth Buffer")
+                            .setLabel("ImGui Depthbuffer")
                             .setFormat(TextureFormat::Depth32Float)
                             .emptyFramebuffer(width, height, m_Context);
-        m_Framebuffer = TextureBuilder::New()
-                            .setLabel("ImGui Framebuffer")
-                            .addTextureUsage(TextureUsage::CopySrc)
-                            .setFormat(m_Context->getSurfaceFormat())
-                            .emptyFramebuffer(width, height, m_Context);
-        m_Framedata.resize(width * height * m_Framebuffer->getFormatSize() / sizeof(std::uint32_t));
+
+        m_LastRenderTime = 0.0f;
     }
 
     App::~App() {
@@ -51,10 +52,6 @@ namespace Yulduz {
 
             Window::PollEvents();
             m_EventDispatcher.dispatch();
-
-            updateFramedata();
-
-            if (m_Render) ImageCopyTexture::New(m_Framebuffer).write(m_Framedata.data(), m_Context);
 
             ImGuiFrame(std::bind(&App::renderImGui, this));
 
@@ -71,7 +68,7 @@ namespace Yulduz {
             RenderPassBuilder::New()
                 .setLabel("Yulduz ImGui Render Pass")
                 .addColorAttachment(ColorAttachment::New(frame))
-                .setDepthStencilAttachment(DepthStencilAttachment::New(m_ContextDepthBuffer))
+                .setDepthStencilAttachment(DepthStencilAttachment::New(m_Depthbuffer))
                 .build(encoder);
         RenderImGui(renderPass);
         renderPass->finish();
@@ -82,30 +79,56 @@ namespace Yulduz {
     }
 
     void App::renderImGui() {
+        updateFramedata();
         ImGuiIO &io = ImGui::GetIO();
         ImGui::DockSpaceOverViewport();
         ImGui::PushFont(m_Font);
 
-        ImGui::ShowDemoWindow();
-
         ImGui::Begin("Settings");
-        m_Render = ImGui::Button("Render", ImVec2{100, 20});
+        ImGui::Text("Last render: %.3fms", m_LastRenderTime);
+
+        if (ImGui::Button("Render"))
+            updateFramedata();
+
         ImGui::End();
+
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
-        if (ImGui::Begin("Viewport")) {
-            ImGui::Image(m_Framebuffer->getView(), ImGui::GetContentRegionAvail());
-        } else {
-            m_IsInGameWindow = false;
-        }
+        ImGui::Begin("Viewport");
+
+        m_Viewport = ImGui::GetContentRegionAvail();
+
+        if (m_Framebuffer)
+            ImGui::Image(m_Framebuffer->getView(), ImVec2{static_cast<float>(m_Framebuffer->getWidth()), static_cast<float>(m_Framebuffer->getHeight())});
+
+        ImGui::End();
         ImGui::PopStyleVar();
         ImGui::PopFont();
-        ImGui::End();
     }
 
     void App::updateFramedata() {
-        for (std::size_t i = 0; i < m_Framedata.size(); i++) {
-            m_Framedata[i] = 0xFFFF00FF;
+        if (m_Viewport.x == 0 || m_Viewport.y == 0) return;
+
+        static Milliseconds::Timer timer;
+        timer.start();
+
+        if (!m_Framebuffer || m_Viewport.x != m_Framebuffer->getWidth() || m_Viewport.y != m_Framebuffer->getHeight()) {
+            m_Framebuffer = TextureBuilder::New()
+                                .setLabel("ImGui Framebuffer")
+                                .addTextureUsage(TextureUsage::CopySrc)
+                                .setFormat(TextureFormat::RGBA8UnormSrgb)
+                                .emptyFramebuffer(m_Viewport.x, m_Viewport.y, m_Context);
+            m_Framedata.resize(m_Framebuffer->getWidth() * m_Framebuffer->getHeight() * m_Framebuffer->getFormatSize() / sizeof(std::uint32_t));
         }
+
+        for (std::size_t i = 0; i < m_Framedata.size(); i++) {
+            m_Framedata[i] = Random::Uint32() | 0xFF000000;
+        }
+
+        ImageCopyTexture::New(m_Framebuffer).write(m_Framedata.data(), m_Context);
+
+        timer.stop();
+
+        m_LastRenderTime = timer.getElapsedSeconds();
     }
 
     void App::keyCallback(const WindowKeyEvent &event) {
@@ -115,20 +138,9 @@ namespace Yulduz {
     }
 
     void App::resizeCallback(const WindowResizeEvent &event) {
-        m_ContextDepthBuffer =
-            TextureBuilder::New()
-                .setLabel("Yulduz Context Depth Buffer")
-                .setFormat(TextureFormat::Depth32Float)
-                .emptyFramebuffer(event.width, event.height, m_Context);
         m_Depthbuffer = TextureBuilder::New()
-                            .setLabel("Yulduz Main Depth Buffer")
+                            .setLabel("Yulduz Context Depth Buffer")
                             .setFormat(TextureFormat::Depth32Float)
                             .emptyFramebuffer(event.width, event.height, m_Context);
-        m_Framebuffer = TextureBuilder::New()
-                            .setLabel("ImGui Framebuffer")
-                            .addTextureUsage(TextureUsage::CopySrc)
-                            .setFormat(m_Context->getSurfaceFormat())
-                            .emptyFramebuffer(event.width, event.height, m_Context);
-        m_Framedata.resize(event.width * event.height * m_Framebuffer->getFormatSize() / sizeof(std::uint32_t));
     }
 }  // namespace Yulduz
