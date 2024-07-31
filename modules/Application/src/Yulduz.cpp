@@ -10,6 +10,8 @@ namespace Yulduz {
         : m_Camera{45.0f, 0.1f, 100.0f} {
         m_Window = Window::New(Window::Settings{
             .Title = "Yulduz Cherno Raytracing",
+            .Width = 1200,
+            .Height = 800,
             .EventDispatcher = m_EventDispatcher,
         });
         auto [width, height] = m_Window->getSize();
@@ -31,6 +33,16 @@ namespace Yulduz {
 
         m_LastRenderTime = 0.0f;
         m_Renderer.setRenderContext(m_Context);
+        m_Scene.Spheres.emplace_back(Sphere{
+            .Position = glm::vec3{0.0f}, 
+            .Radius = 0.5f, 
+            .Albedo = glm::vec3{1.0f, 0.0f, 1.0f},
+        });
+        m_Scene.Spheres.emplace_back(Sphere{
+            .Position = glm::vec3{1.0f,0.0f,-5.0f}, 
+            .Radius = 1.5f, 
+            .Albedo = glm::vec3{0.2f, 0.3f, 1.0f},
+        });
     }
 
     App::~App() {
@@ -79,10 +91,23 @@ namespace Yulduz {
 
         ImGui::Begin("Settings");
         ImGui::Text("Last render: %.3fms", m_LastRenderTime);
-
         if (ImGui::Button("Render"))
             updateFramedata();
+        ImGui::End();
 
+        ImGui::Begin("Scene");
+        for (std::size_t i = 0; i < m_Scene.Spheres.size(); i++) {
+            ImGui::PushID(i);
+
+            Sphere& sphere = m_Scene.Spheres[i];
+            ImGui::DragFloat3("Position", glm::value_ptr(sphere.Position), 0.1f);
+            ImGui::DragFloat("Radius", &sphere.Radius, 0.1f);
+            ImGui::ColorEdit3("Albedo", glm::value_ptr(sphere.Albedo));
+
+            ImGui::Separator();
+
+            ImGui::PopID();
+        }
         ImGui::End();
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
@@ -107,7 +132,7 @@ namespace Yulduz {
 
         m_Renderer.resize(m_Viewport.x, m_Viewport.y);
         m_Camera.OnResize(m_Viewport.x, m_Viewport.y);
-        m_Renderer.render(m_Camera);
+        m_Renderer.render(m_Scene, m_Camera);
 
         timer.stop();
 

@@ -3,6 +3,7 @@
 #include <Yulduz/Engine.hpp>
 #include <Yulduz/RayTracedCamera.hpp>
 #include <Yulduz/Ray.hpp>
+#include <Yulduz/Scene.hpp>
 
 namespace Yulduz {
     class Renderer {
@@ -15,7 +16,7 @@ namespace Yulduz {
         }
 
         void resize(std::uint32_t width, std::uint32_t height);
-        void render(const RayTracedCamera &camera);
+        void render(const Scene &scene, const RayTracedCamera &camera);
 
         std::shared_ptr<Framebuffer> getFinalImage() const { return m_FinalImage; }
 
@@ -25,6 +26,6 @@ namespace Yulduz {
         std::vector<std::uint32_t> m_ImageData;
 
        private:
-        glm::vec4 traceRay(const Ray &ray);
+        glm::vec4 traceRay(const Scene &scene, const Ray &ray);
     };
 };  // namespace Yulduz

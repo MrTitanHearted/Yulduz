@@ -2,6 +2,7 @@
 #include <Yulduz/Engine.hpp>
 #include <Yulduz/Renderer.hpp>
 #include <Yulduz/RayTracedCamera.hpp>
+#include <Yulduz/Scene.hpp>
 
 namespace Yulduz {
     class App {
@@ -18,6 +19,7 @@ namespace Yulduz {
 
         Renderer m_Renderer;
         RayTracedCamera m_Camera;
+        Scene m_Scene;
         ImVec2 m_Viewport;
         float m_LastRenderTime;
 
