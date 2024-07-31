@@ -46,8 +46,10 @@ namespace Yulduz {
     }
 
     std::uint32_t Renderer::perPixel(glm::vec2 coord) {
-        float radius = 0.5f;
-        glm::vec3 rayOrigin{0.0f, 0.0f, 2.0f};
+        static glm::vec3 lightDir = glm::normalize(glm::vec3{-1.0f, -1.0f, 1.0f});
+        static glm::vec3 sphereOrigin{ 0.0f };
+        static float radius = 0.5f;
+        static glm::vec3 rayOrigin{0.0f, 0.0f, 2.0f};
         glm::vec3 rayDirection{coord.x, coord.y, -1.0f};
         // rayDirection = glm::normalize(rayDirection);
 
@@ -67,11 +69,34 @@ namespace Yulduz {
 
         // Quadratic formula discriminant:
         // b^2 - 4ac
+        // (-b + sqrt(discriminant)) / (2.0f * a)
 
         float discriminant = b * b - 4.0f * a * c;
 
         if (discriminant < 0) return 0xFF000000;
 
-        return 0xFFFF00FF;
+        float t0 = (-b - glm::sqrt(discriminant)) / (2.0f * a);
+        float t1 = (-b + glm::sqrt(discriminant)) / (2.0f * a);
+
+        // {
+        //     glm::vec3 hitPosition = rayOrigin + rayDirection * t0;
+        // }
+        // {
+        //     glm::vec3 hitPosition = rayOrigin + rayDirection * t1;
+        // }
+
+        float t = t0 > t1 ? t0 : t1;
+
+        glm::vec3 hitPosition = rayOrigin + rayDirection * t;
+
+        glm::vec3 normal = glm::normalize(hitPosition - sphereOrigin);
+        glm::vec3 mNormal = normal / 2.0f + 0.5f;
+        float light = glm::max(glm::dot(normal, -lightDir), 0.0f);
+
+        std::uint8_t rC = static_cast<std::uint8_t>(255.0f * light);
+        std::uint8_t gC = static_cast<std::uint8_t>(255.0f * light);
+        std::uint8_t bC = static_cast<std::uint8_t>(255.0f * light);
+
+        return 0xFF000000 | (bC << 16) | (gC << 8) | rC;
     }
 }  // namespace Yulduz
