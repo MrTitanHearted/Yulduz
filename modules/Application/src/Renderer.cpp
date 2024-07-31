@@ -78,7 +78,7 @@ namespace Yulduz {
             if (discriminant < 0.0f) continue;
 
             float closestT = (-b - glm::sqrt(discriminant)) / (2.0f * a);
-            if (closestT < hitDistance) {
+            if (closestT < hitDistance && closestT >= 0) {
                 hitDistance = closestT;
                 pClosestSphere = &sphere;
             }
