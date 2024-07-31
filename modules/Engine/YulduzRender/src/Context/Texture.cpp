@@ -19,6 +19,29 @@ namespace Yulduz {
         wgpuTextureRelease(m_Texture);
     }
 
+    void Texture::resize2D(std::uint32_t width, std::uint32_t height, const std::shared_ptr<RenderContext> &context) {
+        if ((getWidth() == width && getHeight() == height) || width == 0 || height == 0) return;
+
+        WGPUTextureDescriptor descriptor{
+            .usage = static_cast<WGPUTextureUsageFlags>(getUsage()),
+            .dimension = static_cast<WGPUTextureDimension>(getDimension()),
+            .size = WGPUExtent3D{.width = width, .height = height, .depthOrArrayLayers = 1},
+            .format = static_cast<WGPUTextureFormat>(getFormat()),
+            .mipLevelCount = 1,
+            .sampleCount = 1,
+            .viewFormatCount = 0,
+            .viewFormats = nullptr,
+        };
+        WGPUTexture texture = wgpuDeviceCreateTexture(context->getDevice(), &descriptor);
+        WGPUTextureView view = wgpuTextureCreateView(texture, nullptr);
+
+        wgpuTextureViewRelease(m_View);
+        wgpuTextureRelease(m_Texture);
+
+        m_Texture = texture;
+        m_View = view;
+    }
+
     std::string Texture::getLabel() const {
         return m_Label;
     }

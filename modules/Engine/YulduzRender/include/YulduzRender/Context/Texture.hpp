@@ -12,6 +12,8 @@ namespace Yulduz {
         Texture(const std::string &label, const WGPUTexture &texture);
         ~Texture();
 
+        void resize2D(std::uint32_t width, std::uint32_t height, const std::shared_ptr<RenderContext> &context);
+
         std::string getLabel() const;
         WGPUTexture get() const;
         WGPUTextureView getView() const;

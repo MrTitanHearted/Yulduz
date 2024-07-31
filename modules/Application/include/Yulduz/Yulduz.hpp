@@ -1,5 +1,6 @@
 #pragma once
 #include <Yulduz/Engine.hpp>
+#include <Yulduz/Renderer.hpp>
 
 namespace Yulduz {
     class App {
@@ -14,8 +15,7 @@ namespace Yulduz {
         std::shared_ptr<RenderContext> m_Context;
         std::shared_ptr<Framebuffer> m_Depthbuffer;
 
-        std::shared_ptr<Framebuffer> m_Framebuffer;
-        std::vector<std::uint32_t> m_Framedata;
+        Renderer m_Renderer;
         ImVec2 m_Viewport;
         float m_LastRenderTime;
 

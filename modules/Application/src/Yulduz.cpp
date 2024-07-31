@@ -1,15 +1,4 @@
 #include <Yulduz/Yulduz.hpp>
-#include <random>
-
-namespace Random {
-    std::uint32_t Uint32() {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-#undef max
-        static std::uniform_int_distribution<std::uint32_t> distr(0, std::numeric_limits<std::uint32_t>::max());
-        return distr(gen);
-    }
-}  // namespace Random
 
 namespace Yulduz {
     void App::Run() {
@@ -40,6 +29,7 @@ namespace Yulduz {
                             .emptyFramebuffer(width, height, m_Context);
 
         m_LastRenderTime = 0.0f;
+        m_Renderer.setRenderContext(m_Context);
     }
 
     App::~App() {
@@ -97,8 +87,9 @@ namespace Yulduz {
 
         m_Viewport = ImGui::GetContentRegionAvail();
 
-        if (m_Framebuffer)
-            ImGui::Image(m_Framebuffer->getView(), ImVec2{static_cast<float>(m_Framebuffer->getWidth()), static_cast<float>(m_Framebuffer->getHeight())});
+        std::shared_ptr<Framebuffer> image = m_Renderer.getFinalImage();
+        if (image)
+            ImGui::Image(image->getView(), ImVec2{static_cast<float>(image->getWidth()), static_cast<float>(image->getHeight())}, ImVec2{0, 1}, ImVec2{1, 0});
 
         ImGui::End();
         ImGui::PopStyleVar();
@@ -111,20 +102,8 @@ namespace Yulduz {
         static Milliseconds::Timer timer;
         timer.start();
 
-        if (!m_Framebuffer || m_Viewport.x != m_Framebuffer->getWidth() || m_Viewport.y != m_Framebuffer->getHeight()) {
-            m_Framebuffer = TextureBuilder::New()
-                                .setLabel("ImGui Framebuffer")
-                                .addTextureUsage(TextureUsage::CopySrc)
-                                .setFormat(TextureFormat::RGBA8UnormSrgb)
-                                .emptyFramebuffer(m_Viewport.x, m_Viewport.y, m_Context);
-            m_Framedata.resize(m_Framebuffer->getWidth() * m_Framebuffer->getHeight() * m_Framebuffer->getFormatSize() / sizeof(std::uint32_t));
-        }
-
-        for (std::size_t i = 0; i < m_Framedata.size(); i++) {
-            m_Framedata[i] = Random::Uint32() | 0xFF000000;
-        }
-
-        ImageCopyTexture::New(m_Framebuffer).write(m_Framedata.data(), m_Context);
+        m_Renderer.resize(m_Viewport.x, m_Viewport.y);
+        m_Renderer.render();
 
         timer.stop();
 
