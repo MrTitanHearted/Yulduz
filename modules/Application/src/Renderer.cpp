@@ -11,7 +11,19 @@ namespace Random {
     }
 }  // namespace Random
 
+namespace Utils {
+    std::uint32_t ConvertToRGBA(const glm::vec4& color) {
+        std::uint8_t r = static_cast<std::uint8_t>(color.r * 255.0f);
+        std::uint8_t g = static_cast<std::uint8_t>(color.g * 255.0f);
+        std::uint8_t b = static_cast<std::uint8_t>(color.b * 255.0f);
+        std::uint8_t a = static_cast<std::uint8_t>(color.a * 255.0f);
+
+        return (a << 24) | (b << 16) | (g << 8) | r;
+    }
+}  // namespace Utils
+
 namespace Yulduz {
+
     void Renderer::resize(std::uint32_t width, std::uint32_t height) {
         if (m_FinalImage) {
             if (m_FinalImage->getWidth() == width && m_FinalImage->getHeight() == height)
@@ -23,36 +35,33 @@ namespace Yulduz {
                 TextureBuilder::New()
                     .setLabel("Renderer Image")
                     .addTextureUsage(TextureUsage::CopySrc)
-                    .setFormat(TextureFormat::RGBA8UnormSrgb)
+                    .setFormat(TextureFormat::RGBA8Unorm)
                     .emptyFramebuffer(width, height, m_Context);
         }
 
         m_ImageData.resize(width * height);
     }
 
-    void Renderer::render() {
+    void Renderer::render(const RayTracedCamera& camera) {
+        const glm::vec3& rayOrigin = camera.GetPosition();
+
+        Ray ray{.Origin = camera.GetPosition()};
+
         auto [width, height] = m_FinalImage->getSize2D();
         for (std::uint32_t y = 0; y < height; y++) {
             for (std::uint32_t x = 0; x < width; x++) {
-                glm::vec2 coord{static_cast<float>(x) / static_cast<float>(width), static_cast<float>(y) / static_cast<float>(height)};
-                coord = coord * 2.0f - 1.0f;  // -1 -> 1
                 std::size_t i = x + y * width;
-
-                m_ImageData[i] = perPixel(coord);
+                ray.Direction = camera.GetRayDirections()[i];
+                glm::vec4 color = glm::clamp(traceRay(ray), glm::vec4{0.0f}, glm::vec4{1.0f});
+                m_ImageData[i] = Utils::ConvertToRGBA(color);
             }
         }
 
         ImageCopyTexture::New(m_FinalImage).write(m_ImageData.data(), m_Context);
     }
 
-    std::uint32_t Renderer::perPixel(glm::vec2 coord) {
-        static glm::vec3 lightDir = glm::normalize(glm::vec3{-1.0f, -1.0f, 1.0f});
-        static glm::vec3 sphereOrigin{ 0.0f };
+    glm::vec4 Renderer::traceRay(const Ray& ray) {
         static float radius = 0.5f;
-        static glm::vec3 rayOrigin{0.0f, 0.0f, 2.0f};
-        glm::vec3 rayDirection{coord.x, coord.y, -1.0f};
-        // rayDirection = glm::normalize(rayDirection);
-
         // (bx^2 + by^2)t^2 + 2(axbx + ayby)t + (ax^2+ay^2-r^2)=0
         // where
         // a = ray origin
@@ -63,40 +72,29 @@ namespace Yulduz {
         // float a = rayDirection.x * rayDirection.x + rayDirection.y * rayDirection.y + rayDirection.z * rayDirection.z;
         // float b = 2.0f * (rayOrigin.x * rayDirection.x + rayOrigin.y * rayDirection.y);
         // float c = rayOrigin.x * rayOrigin.x + rayOrigin.y * rayOrigin.y - radius * radius;
-        float a = glm::dot(rayDirection, rayDirection);
-        float b = 2.0f * glm::dot(rayOrigin, rayDirection);
-        float c = glm::dot(rayOrigin, rayOrigin) - radius * radius;
+        float a = glm::dot(ray.Direction, ray.Direction);
+        float b = 2.0f * glm::dot(ray.Origin, ray.Direction);
+        float c = glm::dot(ray.Origin, ray.Origin) - radius * radius;
 
         // Quadratic formula discriminant:
         // b^2 - 4ac
-        // (-b + sqrt(discriminant)) / (2.0f * a)
 
         float discriminant = b * b - 4.0f * a * c;
+        if (discriminant < 0.0f) return glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
-        if (discriminant < 0) return 0xFF000000;
+        // (-b + sqrt(discriminant)) / (2a)
+        float t0 = (-b + glm::sqrt(discriminant)) / (2.0f * a);
+        float closestT = (-b - glm::sqrt(discriminant)) / (2.0f * a);
 
-        float t0 = (-b - glm::sqrt(discriminant)) / (2.0f * a);
-        float t1 = (-b + glm::sqrt(discriminant)) / (2.0f * a);
+        glm::vec3 hitPoint = ray.Origin + ray.Direction * closestT;
+        glm::vec3 normal = glm::normalize(hitPoint);
 
-        // {
-        //     glm::vec3 hitPosition = rayOrigin + rayDirection * t0;
-        // }
-        // {
-        //     glm::vec3 hitPosition = rayOrigin + rayDirection * t1;
-        // }
+        static glm::vec3 lightDir = glm::normalize(glm::vec3{-1.0f, -1.0f, -1.0f});
 
-        float t = t0 > t1 ? t0 : t1;
+        float d = glm::max(glm::dot(normal, -lightDir), 0.0f);  // == cos(angle)
 
-        glm::vec3 hitPosition = rayOrigin + rayDirection * t;
-
-        glm::vec3 normal = glm::normalize(hitPosition - sphereOrigin);
-        glm::vec3 mNormal = normal / 2.0f + 0.5f;
-        float light = glm::max(glm::dot(normal, -lightDir), 0.0f);
-
-        std::uint8_t rC = static_cast<std::uint8_t>(255.0f * light);
-        std::uint8_t gC = static_cast<std::uint8_t>(255.0f * light);
-        std::uint8_t bC = static_cast<std::uint8_t>(255.0f * light);
-
-        return 0xFF000000 | (bC << 16) | (gC << 8) | rC;
+        glm::vec3 sphereColor{1.0f, 0.0f, 1.0f};
+        sphereColor *= d;
+        return glm::vec4(sphereColor, 1.0f);
     }
 }  // namespace Yulduz

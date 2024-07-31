@@ -85,7 +85,7 @@ namespace Yulduz {
         if (m_Dispatcher) return;
 
         m_Dispatcher = dispatcher;
-
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
         dispatcher.addCallback<WindowCloseEvent>(std::bind(&Window::closeCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowResizeEvent>(std::bind(&Window::resizeCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowMoveEvent>(std::bind(&Window::moveCallback, this, std::placeholders::_1));
@@ -99,6 +99,7 @@ namespace Yulduz {
         dispatcher.addCallback<WindowCharEvent>(std::bind(&Window::charCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowMouseButtonEvent>(std::bind(&Window::mouseButtonCallback, this, std::placeholders::_1));
         dispatcher.addCallback<WindowMouseScrollEvent>(std::bind(&Window::mouseScrollCallback, this, std::placeholders::_1));
+#endif
     }
 
     void Window::setSize(std::uint32_t width, std::uint32_t height) {

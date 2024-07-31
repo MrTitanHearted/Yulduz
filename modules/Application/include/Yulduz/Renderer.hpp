@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Yulduz/Engine.hpp>
+#include <Yulduz/RayTracedCamera.hpp>
+#include <Yulduz/Ray.hpp>
 
 namespace Yulduz {
     class Renderer {
@@ -13,7 +15,7 @@ namespace Yulduz {
         }
 
         void resize(std::uint32_t width, std::uint32_t height);
-        void render();
+        void render(const RayTracedCamera &camera);
 
         std::shared_ptr<Framebuffer> getFinalImage() const { return m_FinalImage; }
 
@@ -23,6 +25,6 @@ namespace Yulduz {
         std::vector<std::uint32_t> m_ImageData;
 
        private:
-        std::uint32_t perPixel(glm::vec2 coord);
+        glm::vec4 traceRay(const Ray &ray);
     };
 };  // namespace Yulduz

@@ -85,7 +85,8 @@ namespace Yulduz {
 
         static GlfwState g_GlfwState;
 
-       private:
+    private:
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
         void closeCallback(const WindowCloseEvent &event);
         void resizeCallback(const WindowResizeEvent &event);
         void moveCallback(const WindowMoveEvent &event);
@@ -99,6 +100,7 @@ namespace Yulduz {
         void charCallback(const WindowCharEvent &event);
         void mouseButtonCallback(const WindowMouseButtonEvent &event);
         void mouseScrollCallback(const WindowMouseScrollEvent &event);
+#endif
 
         static void GlfwWindowCloseCallback(GLFWwindow *window);
         static void GlfwWindowSizeCallback(GLFWwindow *window, std::int32_t width, std::int32_t height);

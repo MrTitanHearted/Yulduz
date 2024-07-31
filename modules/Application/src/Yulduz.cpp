@@ -6,7 +6,8 @@ namespace Yulduz {
         app.run();
     }
 
-    App::App() {
+    App::App()
+        : m_Camera{45.0f, 0.1f, 100.0f} {
         m_Window = Window::New(Window::Settings{
             .Title = "Yulduz Cherno Raytracing",
             .EventDispatcher = m_EventDispatcher,
@@ -42,6 +43,8 @@ namespace Yulduz {
 
             Window::PollEvents();
             m_EventDispatcher.dispatch();
+
+            m_Camera.OnUpdate(m_Timer.getElapsedSeconds() * 1000.0f, m_Window);
 
             ImGuiFrame(std::bind(&App::renderImGui, this));
 
@@ -103,7 +106,8 @@ namespace Yulduz {
         timer.start();
 
         m_Renderer.resize(m_Viewport.x, m_Viewport.y);
-        m_Renderer.render();
+        m_Camera.OnResize(m_Viewport.x, m_Viewport.y);
+        m_Renderer.render(m_Camera);
 
         timer.stop();
 

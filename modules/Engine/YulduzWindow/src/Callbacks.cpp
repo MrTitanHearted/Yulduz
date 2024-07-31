@@ -3,7 +3,7 @@
 namespace Yulduz {
     const char *getKeyName(KeyCode key);
     std::string getButtonName(MouseButton button);
-
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
     void Window::closeCallback(const WindowCloseEvent &event) {
         YZINFO("Closing Window: '{}'", getTitle());
     }
@@ -69,7 +69,7 @@ namespace Yulduz {
     void Window::mouseScrollCallback(const WindowMouseScrollEvent &event) {
         YZINFO("Scrolling Mouse on Window: '{}' by {}x{}", getTitle(), event.xOffset, event.yOffset);
     }
-
+#endif
     void Window::GlfwWindowCloseCallback(GLFWwindow *window) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
@@ -80,7 +80,7 @@ namespace Yulduz {
         yz->m_Dispatcher.value().get().addEvent<WindowCloseEvent>(WindowCloseEvent(yz));
     }
 
-    void Window::GlfwWindowSizeCallback(GLFWwindow *window, int width, int height) {
+    void Window::GlfwWindowSizeCallback(GLFWwindow *window, std::int32_t width, std::int32_t height) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -100,7 +100,7 @@ namespace Yulduz {
         yz->m_Dispatcher.value().get().addEvent<WindowContentScaleEvent>(WindowContentScaleEvent(yz, xScale, yScale));
     }
 
-    void Window::GlfwWindowPositionCallback(GLFWwindow *window, int x, int y) {
+    void Window::GlfwWindowPositionCallback(GLFWwindow *window, std::int32_t x, std::int32_t y) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -110,7 +110,7 @@ namespace Yulduz {
         yz->m_Dispatcher.value().get().addEvent<WindowMoveEvent>(WindowMoveEvent(yz, x, y));
     }
 
-    void Window::GlfwWindowMaximizeCallback(GLFWwindow *window, int isMaximized) {
+    void Window::GlfwWindowMaximizeCallback(GLFWwindow *window, std::int32_t isMaximized) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -123,7 +123,7 @@ namespace Yulduz {
             yz->m_Dispatcher.value().get().addEvent<WindowRestoreEvent>(WindowRestoreEvent(yz));
     }
 
-    void Window::GlfwWindowMinimizeCallback(GLFWwindow *window, int isMinimized) {
+    void Window::GlfwWindowMinimizeCallback(GLFWwindow *window, std::int32_t isMinimized) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -136,7 +136,7 @@ namespace Yulduz {
             yz->m_Dispatcher.value().get().addEvent<WindowRestoreEvent>(WindowRestoreEvent(yz));
     }
 
-    void Window::GlfwWindowFocusCallback(GLFWwindow *window, int focused) {
+    void Window::GlfwWindowFocusCallback(GLFWwindow *window, std::int32_t focused) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -149,7 +149,7 @@ namespace Yulduz {
             yz->m_Dispatcher.value().get().addEvent<WindowLoseFocusEvent>(WindowLoseFocusEvent(yz));
     }
 
-    void Window::GlfwWindowKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    void Window::GlfwWindowKeyCallback(GLFWwindow *window, std::int32_t key, std::int32_t scancode, std::int32_t action, std::int32_t mods) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -166,7 +166,7 @@ namespace Yulduz {
         yz->m_Dispatcher.value().get().addEvent<WindowKeyEvent>(WindowKeyEvent(yz, static_cast<KeyCode>(key), static_cast<KeyMod>(mods), static_cast<KeyAction>(action)));
     }
 
-    void Window::GlfwWindowCharCallback(GLFWwindow *window, unsigned int codepoint) {
+    void Window::GlfwWindowCharCallback(GLFWwindow *window, std::uint32_t codepoint) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -186,7 +186,7 @@ namespace Yulduz {
         yz->m_Dispatcher.value().get().addEvent<WindowMouseMoveEvent>(WindowMouseMoveEvent(yz, x, y));
     }
 
-    void Window::GlfwWindowMouseEnterCallback(GLFWwindow *window, int entered) {
+    void Window::GlfwWindowMouseEnterCallback(GLFWwindow *window, std::int32_t entered) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -199,7 +199,7 @@ namespace Yulduz {
             yz->m_Dispatcher.value().get().addEvent<WindowMouseLeaveEvent>(WindowMouseLeaveEvent(yz));
     }
 
-    void Window::GlfwWindowMouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
+    void Window::GlfwWindowMouseButtonCallback(GLFWwindow *window, std::int32_t button, std::int32_t action, std::int32_t mods) {
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         if (yz == nullptr) return;
 
@@ -227,7 +227,7 @@ namespace Yulduz {
     }
 
     const char *getKeyName(KeyCode key) {
-        const char *keyName = glfwGetKeyName(static_cast<int>(key), 0);
+        const char *keyName = glfwGetKeyName(static_cast<std::int32_t>(key), 0);
         if (keyName == nullptr) {
             switch (key) {
                 case KeyCode::_DELETE:
@@ -354,7 +354,7 @@ namespace Yulduz {
     }
 
     std::string getButtonName(MouseButton button) {
-        int formatButton = static_cast<int>(button) + 1;
+        std::int32_t formatButton = static_cast<std::int32_t>(button) + 1;
         return button == MouseButton::LEFT
                    ? "Left Mouse Button"
                : button == MouseButton::RIGHT

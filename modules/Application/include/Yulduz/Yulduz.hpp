@@ -1,6 +1,7 @@
 #pragma once
 #include <Yulduz/Engine.hpp>
 #include <Yulduz/Renderer.hpp>
+#include <Yulduz/RayTracedCamera.hpp>
 
 namespace Yulduz {
     class App {
@@ -16,6 +17,7 @@ namespace Yulduz {
         std::shared_ptr<Framebuffer> m_Depthbuffer;
 
         Renderer m_Renderer;
+        RayTracedCamera m_Camera;
         ImVec2 m_Viewport;
         float m_LastRenderTime;
 
@@ -28,7 +30,7 @@ namespace Yulduz {
         void run();
         void renderFrame(const std::shared_ptr<Framebuffer> &frame);
         void renderImGui();
-        
+
         void updateFramedata();
 
         void keyCallback(const WindowKeyEvent &event);
