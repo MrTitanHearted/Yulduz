@@ -34,25 +34,25 @@ namespace Yulduz {
                             .setFormat(TextureFormat::Depth32Float)
                             .emptyFramebuffer(width, height, m_Context);
         m_Renderer.setRenderContext(m_Context);
+
+        m_Scene.Materials.emplace_back(Material{
+            .Albedo = glm::vec3{1.0f, 0.0f, 1.0f},
+            .Roughness = 0.0f,
+        });
+        m_Scene.Materials.emplace_back(Material{
+            .Albedo = glm::vec3{0.2f, 0.3f, 1.0f},
+            .Roughness = 0.1f,
+        });
+
         m_Scene.Spheres.emplace_back(Sphere{
             .Position = glm::vec3{0.0f},
-            .Radius = 0.5f,
-            .Albedo = glm::vec3{1.0f, 0.0f, 1.0f},
-        });
-        m_Scene.Spheres.emplace_back(Sphere{
-            .Position = glm::vec3{1.0f, 0.0f, -5.0f},
-            .Radius = 1.5f,
-            .Albedo = glm::vec3{0.2f, 0.3f, 1.0f},
-        });
-        m_Scene.Spheres.emplace_back(Sphere{
-            .Position = glm::vec3{2.0f, 0.0f, 5.0f},
-            .Radius = 0.8f,
-            .Albedo = glm::vec3{0.32f, 0.8f, 0.04f},
-        });
-        m_Scene.Spheres.emplace_back(Sphere{
-            .Position = glm::vec3{-6.0f, 0.0f, 0.0f},
             .Radius = 1.0f,
-            .Albedo = glm::vec3{0.243f, 0.33f, 1.0f},
+            .MaterialIndex = 0,
+        });
+        m_Scene.Spheres.emplace_back(Sphere{
+            .Position = glm::vec3{0.0f, -101.0f, 0.0f},
+            .Radius = 100.0f,
+            .MaterialIndex = 1,
         });
     }
 
@@ -67,7 +67,7 @@ namespace Yulduz {
             static Milliseconds::Timer cameraTimer;
             static Milliseconds::Timer imguiTimer;
             static Milliseconds::Timer renderTimer;
-            
+
             timer.start();
 
             eventTimer.start();
@@ -151,7 +151,20 @@ namespace Yulduz {
             Sphere &sphere = m_Scene.Spheres[i];
             ImGui::DragFloat3("Position", glm::value_ptr(sphere.Position), 0.1f);
             ImGui::DragFloat("Radius", &sphere.Radius, 0.1f);
-            ImGui::ColorEdit3("Albedo", glm::value_ptr(sphere.Albedo));
+            ImGui::DragInt("Material", &sphere.MaterialIndex, 1.0f, 0, static_cast<std::int32_t>(m_Scene.Materials.size() - 1));
+
+            ImGui::Separator();
+
+            ImGui::PopID();
+        }
+
+        for (std::size_t i = 0; i < m_Scene.Materials.size(); i++) {
+            ImGui::PushID(i);
+
+            Material &material = m_Scene.Materials[i];
+            ImGui::ColorEdit3("Albedo", glm::value_ptr(material.Albedo));
+            ImGui::DragFloat("Roughness", &material.Roughness, 0.05f, 0.0f, 1.0f);
+            ImGui::DragFloat("Metallic", &material.Metallic, 0.05f, 0.0f, 1.0f);
 
             ImGui::Separator();
 
@@ -201,9 +214,11 @@ namespace Yulduz {
     }
 
     void App::resizeCallback(const WindowResizeEvent &event) {
+        ImGui_ImplWGPU_InvalidateDeviceObjects();
         m_Depthbuffer = TextureBuilder::New()
                             .setLabel("Yulduz Context Depth Buffer")
                             .setFormat(TextureFormat::Depth32Float)
                             .emptyFramebuffer(event.width, event.height, m_Context);
+        ImGui_ImplWGPU_CreateDeviceObjects();
     }
 }  // namespace Yulduz

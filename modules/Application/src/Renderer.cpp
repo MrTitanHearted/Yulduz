@@ -2,12 +2,30 @@
 #include <random>
 
 namespace Random {
-    std::uint32_t Uint32() {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
 #undef max
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uint32_t Uint32() {
         static std::uniform_int_distribution<std::uint32_t> distr(0, std::numeric_limits<std::uint32_t>::max());
         return distr(gen);
+    }
+
+    double Float64() {
+        static std::uniform_real_distribution<double> distr(0.0, 1.0);
+        return distr(gen);
+    }
+
+    float Float32() {
+        static std::uniform_real_distribution<float> distr(0.0f, 1.0f);
+        return distr(gen);
+    }
+
+    glm::vec3 Vec3(float min, float max) {
+        return glm::vec3{
+            Float32() * (max - min) + min,
+            Float32() * (max - min) + min,
+            Float32() * (max - min) + min,
+        };
     }
 }  // namespace Random
 
@@ -67,12 +85,12 @@ namespace Yulduz {
         glm::vec3 color{0.0f};
         float multiplier = 1.0f;
 
-        std::size_t bounces = 4;
+        std::size_t bounces = 5;
         for (std::size_t i = 0; i < bounces; i++) {
             HitPayload payload = traceRay(ray);
 
             if (payload.HitDistance < 0) {
-                glm::vec3 skyColor{0.0f};
+                glm::vec3 skyColor{0.6f, 0.7f, 0.9f};
                 color += skyColor * multiplier;
                 break;
             }
@@ -81,14 +99,15 @@ namespace Yulduz {
             float lightIntensity = glm::max(glm::dot(payload.WorldNormal, -lightDir), 0.0f);
 
             const Sphere &sphere = m_ActiveScene->Spheres[payload.ObjectIndex];
-            glm::vec3 sphereColor = sphere.Albedo;
+            const Material &material = m_ActiveScene->Materials[sphere.MaterialIndex];
+            glm::vec3 sphereColor = material.Albedo;
             sphereColor *= lightIntensity;
             color += sphereColor * multiplier;
 
-            multiplier *= 0.7f;
+            multiplier *= 0.5f;
 
             ray.Origin = payload.WorldPosition + payload.WorldNormal * 0.0001f;
-            ray.Direction = glm::reflect(ray.Direction, payload.WorldNormal);
+            ray.Direction = glm::reflect(ray.Direction, payload.WorldNormal + material.Roughness * Random::Vec3(-0.5f, 0.5f));
         }
 
         return glm::vec4(color, 1.0f);
