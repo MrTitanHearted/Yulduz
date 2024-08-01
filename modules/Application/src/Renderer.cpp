@@ -4,8 +4,8 @@
 
 namespace Random {
 #undef max
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
+    static thread_local std::random_device rd;
+    static thread_local std::mt19937 gen(rd());
     std::uint32_t Uint32() {
         static std::uniform_int_distribution<std::uint32_t> distr(0, std::numeric_limits<std::uint32_t>::max());
         return distr(gen);
@@ -80,7 +80,7 @@ namespace Yulduz {
 #define MT 1
 #if MT
         std::for_each(std::execution::par, m_ImageVerticalIter.begin(), m_ImageVerticalIter.end(), [&](std::uint32_t y) {
-#if 0
+#if 1
             std::for_each(std::execution::par, m_ImageHorizontalIter.begin(), m_ImageHorizontalIter.end(), [&](std::uint32_t x) {
                 glm::vec4 color = perPixel(x, y);
                 m_AccumulationData[x + y * width] += color;
