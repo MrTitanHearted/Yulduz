@@ -1,5 +1,6 @@
 #include <Yulduz/Renderer.hpp>
 #include <random>
+#include <execution>
 
 namespace Random {
 #undef max
@@ -59,6 +60,14 @@ namespace Yulduz {
 
         m_ImageData.resize(width * height);
         m_AccumulationData.resize(width * height);
+
+        m_ImageHorizontalIter.resize(width);
+        m_ImageVerticalIter.resize(height);
+
+        for (std::uint32_t i = 0; i < width; i++)
+            m_ImageHorizontalIter[i] = i;
+        for (std::uint32_t i = 0; i < height; i++)
+            m_ImageVerticalIter[i] = i;
     }
 
     void Renderer::render(const Scene &scene, const RayTracedCamera &camera) {
@@ -68,7 +77,34 @@ namespace Yulduz {
         auto [width, height] = m_FinalImage->getSize2D();
         if (m_FrameIndex == 1)
             memset(m_AccumulationData.data(), 0, width * height * sizeof(glm::vec4));
+#define MT 1
+#if MT
+        std::for_each(std::execution::par, m_ImageVerticalIter.begin(), m_ImageVerticalIter.end(), [&](std::uint32_t y) {
+#if 0
+            std::for_each(std::execution::par, m_ImageHorizontalIter.begin(), m_ImageHorizontalIter.end(), [&](std::uint32_t x) {
+                glm::vec4 color = perPixel(x, y);
+                m_AccumulationData[x + y * width] += color;
 
+                glm::vec4 accumulatedColor = m_AccumulationData[x + y * width];
+                accumulatedColor /= m_FrameIndex;
+
+                accumulatedColor = glm::clamp(accumulatedColor, glm::vec4{0.0f}, glm::vec4{1.0f});
+                m_ImageData[x + y * width] = Utils::ConvertToRGBA(accumulatedColor);
+            });
+#else
+            for (std::uint32_t x = 0; x < width; x++) {
+                glm::vec4 color = perPixel(x, y);
+                m_AccumulationData[x + y * width] += color;
+
+                glm::vec4 accumulatedColor = m_AccumulationData[x + y * width];
+                accumulatedColor /= m_FrameIndex;
+
+                accumulatedColor = glm::clamp(accumulatedColor, glm::vec4{ 0.0f }, glm::vec4{ 1.0f });
+                m_ImageData[x + y * width] = Utils::ConvertToRGBA(accumulatedColor);
+            }
+#endif
+        });
+#else
         for (std::uint32_t y = 0; y < height; y++) {
             for (std::uint32_t x = 0; x < width; x++) {
                 glm::vec4 color = perPixel(x, y);
@@ -81,7 +117,7 @@ namespace Yulduz {
                 m_ImageData[x + y * width] = Utils::ConvertToRGBA(accumulatedColor);
             }
         }
-
+#endif
         ImageCopyTexture::New(m_FinalImage).write(m_ImageData.data(), m_Context);
 
         if (m_Settings.Accumulate)

@@ -46,6 +46,9 @@ namespace Yulduz {
 
         Settings m_Settings;
 
+        std::vector<std::uint32_t> m_ImageHorizontalIter;
+        std::vector<std::uint32_t> m_ImageVerticalIter;
+
         const Scene *m_ActiveScene;
         const RayTracedCamera *m_ActiveCamera;
 
