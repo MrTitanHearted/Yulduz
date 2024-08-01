@@ -8,6 +8,11 @@
 namespace Yulduz {
     class Renderer {
        public:
+        struct Settings {
+            bool Accumulate = true;
+        };
+
+       public:
         Renderer() : m_ActiveScene{nullptr}, m_ActiveCamera{nullptr} {}
         ~Renderer() = default;
 
@@ -17,8 +22,10 @@ namespace Yulduz {
 
         void resize(std::uint32_t width, std::uint32_t height);
         void render(const Scene &scene, const RayTracedCamera &camera);
+        void resetFrameIndex() { m_FrameIndex = 1; }
 
         std::shared_ptr<Framebuffer> getFinalImage() const { return m_FinalImage; }
+        Settings &getSettings() { return m_Settings; }
 
        private:
         struct HitPayload {
@@ -34,6 +41,10 @@ namespace Yulduz {
         std::shared_ptr<RenderContext> m_Context;
         std::shared_ptr<Framebuffer> m_FinalImage;
         std::vector<std::uint32_t> m_ImageData;
+        std::vector<glm::vec4> m_AccumulationData;
+        std::uint32_t m_FrameIndex = 1;
+
+        Settings m_Settings;
 
         const Scene *m_ActiveScene;
         const RayTracedCamera *m_ActiveCamera;

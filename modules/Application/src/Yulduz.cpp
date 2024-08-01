@@ -77,7 +77,7 @@ namespace Yulduz {
             m_EventDispatchTime = eventTimer.getElapsed();
 
             cameraTimer.start();
-            m_Camera.OnUpdate(m_DeltaTime, m_Window);
+            if (m_Camera.OnUpdate(m_DeltaTime, m_Window)) m_Renderer.resetFrameIndex();
             cameraTimer.stop();
             m_CameraTime = cameraTimer.getElapsed();
 
@@ -139,6 +139,9 @@ namespace Yulduz {
         ImGui::Text("Render Time: %.3fms", m_RenderTime);
         if (ImGui::Button("Render"))
             updateFramedata();
+        ImGui::Checkbox("Accumulate", &m_Renderer.getSettings().Accumulate);
+        if (ImGui::Button("Reset"))
+            m_Renderer.resetFrameIndex();
         ImGui::End();
         settingsTimer.stop();
         settingsTime = settingsTimer.getElapsed();
@@ -204,7 +207,7 @@ namespace Yulduz {
 
         rayTracingTimer.stop();
 
-        m_RayTracingTime = rayTracingTimer.getElapsedSeconds();
+        m_RayTracingTime = rayTracingTimer.getElapsed();
     }
 
     void App::keyCallback(const WindowKeyEvent &event) {

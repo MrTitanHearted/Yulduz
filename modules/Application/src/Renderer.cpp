@@ -58,6 +58,7 @@ namespace Yulduz {
         }
 
         m_ImageData.resize(width * height);
+        m_AccumulationData.resize(width * height);
     }
 
     void Renderer::render(const Scene &scene, const RayTracedCamera &camera) {
@@ -65,14 +66,28 @@ namespace Yulduz {
         m_ActiveCamera = &camera;
 
         auto [width, height] = m_FinalImage->getSize2D();
+        if (m_FrameIndex == 1)
+            memset(m_AccumulationData.data(), 0, width * height * sizeof(glm::vec4));
+
         for (std::uint32_t y = 0; y < height; y++) {
             for (std::uint32_t x = 0; x < width; x++) {
-                glm::vec4 color = glm::clamp(perPixel(x, y), glm::vec4{0.0f}, glm::vec4{1.0f});
-                m_ImageData[x + y * width] = Utils::ConvertToRGBA(color);
+                glm::vec4 color = perPixel(x, y);
+                m_AccumulationData[x + y * width] += color;
+
+                glm::vec4 accumulatedColor = m_AccumulationData[x + y * width];
+                accumulatedColor /= m_FrameIndex;
+
+                accumulatedColor = glm::clamp(accumulatedColor, glm::vec4{0.0f}, glm::vec4{1.0f});
+                m_ImageData[x + y * width] = Utils::ConvertToRGBA(accumulatedColor);
             }
         }
 
         ImageCopyTexture::New(m_FinalImage).write(m_ImageData.data(), m_Context);
+
+        if (m_Settings.Accumulate)
+            m_FrameIndex++;
+        else
+            m_FrameIndex = 1;
     }
 
     glm::vec4 Renderer::perPixel(std::uint32_t x, std::uint32_t y) {
