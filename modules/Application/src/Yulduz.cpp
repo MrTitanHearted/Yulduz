@@ -44,6 +44,16 @@ namespace Yulduz {
             .Radius = 1.5f,
             .Albedo = glm::vec3{0.2f, 0.3f, 1.0f},
         });
+        m_Scene.Spheres.emplace_back(Sphere{
+            .Position = glm::vec3{2.0f, 0.0f, 5.0f},
+            .Radius = 0.8f,
+            .Albedo = glm::vec3{0.32f, 0.8f, 0.04f},
+        });
+        m_Scene.Spheres.emplace_back(Sphere{
+            .Position = glm::vec3{-6.0f, 0.0f, 0.0f},
+            .Radius = 1.0f,
+            .Albedo = glm::vec3{0.243f, 0.33f, 1.0f},
+        });
     }
 
     App::~App() {
@@ -109,17 +119,31 @@ namespace Yulduz {
         ImGui::DockSpaceOverViewport();
         ImGui::PushFont(m_Font);
 
+        static Milliseconds::Timer settingsTimer;
+        static Milliseconds::Timer sceneTimer;
+        static Milliseconds::Timer viewportTimer;
+        static double settingsTime;
+        static double sceneTime;
+        static double viewportTime;
+
+        settingsTimer.start();
         ImGui::Begin("Settings");
         ImGui::Text("Delta Time: %.3fms", m_DeltaTime);
         ImGui::Text("Event Dispatch Time: %.3fms", m_EventDispatchTime);
         ImGui::Text("Camera Time: %.3fms", m_CameraTime);
         ImGui::Text("ImGui Time: %.3fms", m_ImGuiTime);
+        ImGui::Text("\tSettings Time: %.3fms", settingsTime);
+        ImGui::Text("\tScene Time: %.3fms", sceneTime);
+        ImGui::Text("\tViewport Time: %.3fms", viewportTime);
         ImGui::Text("\tRayTracing Time: %.3fms", m_RayTracingTime);
         ImGui::Text("Render Time: %.3fms", m_RenderTime);
         if (ImGui::Button("Render"))
             updateFramedata();
         ImGui::End();
+        settingsTimer.stop();
+        settingsTime = settingsTimer.getElapsed();
 
+        sceneTimer.start();
         ImGui::Begin("Scene");
         for (std::size_t i = 0; i < m_Scene.Spheres.size(); i++) {
             ImGui::PushID(i);
@@ -134,7 +158,10 @@ namespace Yulduz {
             ImGui::PopID();
         }
         ImGui::End();
+        sceneTimer.stop();
+        sceneTime = sceneTimer.getElapsed();
 
+        viewportTimer.start();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
         ImGui::Begin("Viewport");
 
@@ -146,6 +173,8 @@ namespace Yulduz {
 
         ImGui::End();
         ImGui::PopStyleVar();
+        viewportTimer.stop();
+        viewportTime = viewportTimer.getElapsed();
 
         ImGui::PopFont();
     }

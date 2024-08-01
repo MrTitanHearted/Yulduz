@@ -15,3 +15,7 @@ endif()
 target_include_directories(Yulduz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_link_libraries(Yulduz PRIVATE Yulduz::Engine)
+
+if(MSVC)
+    set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Yulduz)
+endif()
