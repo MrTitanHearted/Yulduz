@@ -151,6 +151,7 @@ namespace Yulduz {
         if (ImGui::Button("Render"))
             updateFramedata();
         ImGui::Checkbox("Accumulate", &m_Renderer.getSettings().Accumulate);
+        ImGui::Checkbox("Slow Random", &m_Renderer.getSettings().SlowRandom);
         if (ImGui::Button("Reset"))
             m_Renderer.resetFrameIndex();
         ImGui::End();

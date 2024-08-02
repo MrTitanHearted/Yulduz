@@ -21,12 +21,31 @@ namespace Random {
         return distr(gen);
     }
 
+    std::uint32_t PCGUint32(std::uint32_t seed) {
+        std::uint32_t state = seed * 747796405u + 2891336453u;
+        std::uint32_t word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+        return (word >> 22u) ^ word;
+    }
+
+    float PCGFloat32(std::uint32_t &seed) {
+        seed = PCGUint32(seed);
+        return static_cast<float>(seed) / static_cast<float>(std::numeric_limits<std::uint32_t>::max());
+    }
+
     glm::vec3 Vec3(float min, float max) {
         return glm::vec3{
             Float32() * (max - min) + min,
             Float32() * (max - min) + min,
             Float32() * (max - min) + min,
         };
+    }
+
+    glm::vec3 PCGInUnitSphere(std::uint32_t &seed) {
+        return glm::normalize(glm::vec3{
+            PCGFloat32(seed) * 2.0f - 1.0f,
+            PCGFloat32(seed) * 2.0f - 1.0f,
+            PCGFloat32(seed) * 2.0f - 1.0f,
+        });
     }
 
     glm::vec3 InUnitSphere() {
@@ -140,10 +159,14 @@ namespace Yulduz {
         glm::vec3 light{0.0f};
         glm::vec3 contribution{1.0f};
 
+        std::uint32_t seed = x + y * m_FinalImage->getWidth();
+        seed *= m_FrameIndex;
+
         std::size_t bounces = 5;
         for (std::size_t i = 0; i < bounces; i++) {
-            HitPayload payload = traceRay(ray);
+            seed += i;
 
+            HitPayload payload = traceRay(ray);
             if (payload.HitDistance < 0) {
                 glm::vec3 skyColor{0.6f, 0.7f, 0.9f};
                 // light += skyColor * contribution;
@@ -157,7 +180,10 @@ namespace Yulduz {
             light += material.getEmission();
 
             ray.Origin = payload.WorldPosition + payload.WorldNormal * 0.0001f;
-            ray.Direction = glm::normalize(payload.WorldNormal + Random::InUnitSphere());
+            if (m_Settings.SlowRandom)
+                ray.Direction = glm::normalize(payload.WorldNormal + Random::InUnitSphere());
+            else
+                ray.Direction = glm::normalize(payload.WorldNormal + Random::PCGInUnitSphere(seed));
         }
 
         return glm::vec4(light, 1.0f);
