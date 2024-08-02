@@ -261,7 +261,7 @@ namespace Yulduz {
 
         if (glfwInit() == GLFW_FALSE) {
             LOG_FATAL("Failed to initialize GLFW");
-            throw std::exception("Failed to initialize GLFW");
+            throw std::runtime_error("Failed to initialize GLFW");
         }
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);

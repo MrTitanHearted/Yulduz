@@ -25,6 +25,9 @@
 #include <memory>
 #include <thread>
 #include <format>
+#include <type_traits>
+#include <typeindex>
+#include <typeinfo>
 
 namespace fs = std::filesystem;
 

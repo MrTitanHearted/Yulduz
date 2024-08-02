@@ -23,22 +23,23 @@ endif()
 
 if(MSVC)
     add_compile_options(/MP)
-endif()
 
-if(CMAKE_BUILD_TYPE MATCHES Release)
-    add_compile_definitions(YULDUZ_BUILD_TYPE_RELEASE)
+    add_compile_definitions(
+        $<$<CONFIG:Release>:YULDUZ_BUILD_TYPE_RELEASE>
+        $<$<CONFIG:Debug>:YULDUZ_BUILD_TYPE_DEBUG>
+    )
 
-    if(MSVC)
-        add_compile_options(/O2)
-    else()
-        add_compile_options(-O3)
-    endif()
+    add_compile_options(
+        $<$<CONFIG:Release>:/O2>
+        $<$<CONFIG:Debug>:/Zi>
+        $<$<CONFIG:Debug>:/Od>
+    )
 else()
-    add_compile_definitions(YULDUZ_BUILD_TYPE_DEBUG)
-
-    if(MSVC)
-        add_compile_options(/Zi /Od)
+    if(CMAKE_BUILD_TYPE MATCHES Release)
+        add_compile_definitions(YULDUZ_BUILD_TYPE_RELEASE)
+        add_compile_options(-O3)
     else()
+        add_compile_definitions(YULDUZ_BUILD_TYPE_DEBUG)
         add_compile_options(-g)
     endif()
 endif()

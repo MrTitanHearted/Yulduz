@@ -1,9 +1,16 @@
 set(WGPU_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include)
 
-if(CMAKE_BUILD_TYPE MATCHES Release)
-    set(WGPU_LIBRARY_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/Release)
+if(MSVC)
+  set(WGPU_LIBRARY_DIR
+    $<$<CONFIG:Release>:${CMAKE_CURRENT_LIST_DIR}/lib/Release>
+    $<$<CONFIG:Debug>:${CMAKE_CURRENT_LIST_DIR}/lib/Debug>
+  )
 else()
+  if(CMAKE_BUILD_TYPE MATCHES Release)
+    set(WGPU_LIBRARY_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/Release)
+  else()
     set(WGPU_LIBRARY_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/Debug)
+  endif()
 endif()
 
 add_library(wgpu INTERFACE IMPORTED)

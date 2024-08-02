@@ -100,23 +100,29 @@ namespace Yulduz {
 
         template <typename Event, typename = std::enable_if_t<std::is_base_of<IEvent, Event>::value>>
         void addEvent(const Event &event) {
-            m_Events.emplace_back(std::make_unique<Event>(event));
+            std::size_t eventHashCode = typeid(Event).hash_code();
+            m_EventsMap[eventHashCode].emplace_back(std::make_unique<Event>(event));
         }
 
         void dispatch() {
-            for (const std::unique_ptr<IEvent> &event : m_Events) {
-                std::size_t eventHashCode = typeid(*event).hash_code();
-                if (m_CallbacksMap.find(eventHashCode) == m_CallbacksMap.end()) continue;
-                for (const Callback &callback : m_CallbacksMap[eventHashCode]) {
-                    callback(event.get());
+            for (auto [eventHashCode, callbacksVector] : m_CallbacksMap) {
+                const EventVector &events = m_EventsMap[eventHashCode];
+                if (events.size() == 0) continue;
+
+                for (const Callback &callback : callbacksVector) {
+                    for (const std::unique_ptr<IEvent> &event : events) {
+                        callback(event.get());
+                    }
                 }
             }
 
-            m_Events.clear();
+            m_EventsMap.clear();
         }
 
        private:
-        std::vector<std::unique_ptr<IEvent>> m_Events;
+        using EventVector = std::vector<std::unique_ptr<IEvent>>;
+
+        std::unordered_map<std::size_t, EventVector> m_EventsMap;
     };
 
     class EventListener : public EventCallbackManager {

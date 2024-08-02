@@ -17,6 +17,14 @@ build/
 build-release/
 build-shared/
 build-shared-release/
+build-ninja/
+build-ninja-release/
+build-ninja-shared/
+build-ninja-shared-release/
+build-gnu/
+build-gnu-release/
+build-gnu-shared/
+build-gnu-shared-release/
 
 wgpu-native.zip
 
