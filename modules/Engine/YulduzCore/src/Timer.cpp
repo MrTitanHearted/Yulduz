@@ -22,18 +22,19 @@ namespace Yulduz {
     std::string Timer::GetCurrentTimeStr() {
         SystemTimePoint now = SystemClock::now();
         std::time_t time = SystemClock::to_time_t(now);
-        std::tm *tm = std::localtime(&time);
+        std::tm tm{};
+        localtime_s(&tm, &time);
 
-        tm->tm_year += 1900;
-        tm->tm_mon += 1;
+        tm.tm_year += 1900;
+        tm.tm_mon += 1;
 
         return std::vformat("{0:04d}-{1:02d}-{2:02d} {3:02d}:{4:02d}:{5:02d}",
-                            std::make_format_args(tm->tm_year,
-                                                  tm->tm_mon,
-                                                  tm->tm_mday,
-                                                  tm->tm_hour,
-                                                  tm->tm_min,
-                                                  tm->tm_sec));
+                            std::make_format_args(tm.tm_year,
+                                                  tm.tm_mon,
+                                                  tm.tm_mday,
+                                                  tm.tm_hour,
+                                                  tm.tm_min,
+                                                  tm.tm_sec));
     }
 
     double Seconds::Timer::getElapsed() const {
