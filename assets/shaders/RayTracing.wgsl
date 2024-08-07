@@ -57,7 +57,7 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3<u32>) {
     var contribution = vec3<f32>(1.0);
 
     var seed = gid.x + gid.y * frameSize.x;
-    seed *= camera.FrameIndex * u32(camera.Time * 1000.0);
+    seed *= camera.FrameIndex * u32(camera.Time);
 
     for (var i: u32 = 0u; i < camera.Bounces; i++) {
         seed += i;
@@ -77,7 +77,7 @@ fn cs_main(@builtin(global_invocation_id) gid: vec3<u32>) {
         light += material.EmissionColor * material.EmissionPower;
 
         ray.Origin = payload.WorldPosition + payload.WorldNormal * 0.00001;
-        ray.Direction = normalize(payload.WorldNormal + randomInUnitSphere(&seed));
+        ray.Direction = normalize(payload.WorldNormal + material.Roughness * randomInUnitSphere(&seed));
     }
 
     let color = vec4<f32>(light, 1.0);
@@ -123,7 +123,11 @@ fn traceRay(ray: Ray) -> HitPayload {
             continue;
         }
 
-        let t = (-bHalf - sqrt(determinant)) / a;
+        var t = (-bHalf - sqrt(determinant)) / a;
+
+        if t < 0.0 {
+            t = (-bHalf + sqrt(determinant)) / a;
+        }
 
         if hitDistance > t && t > 0.0 {
             hitDistance = t;
@@ -170,9 +174,15 @@ fn pcgf32(seed: ptr<function, u32>) -> f32 {
 }
 
 fn randomInUnitSphere(seed: ptr<function, u32>) -> vec3<f32> {
+    let u = pcgf32(seed);
+    let v = pcgf32(seed);
+
+    let theta = 2.0 * PI * u;
+    let phi = acos(2.0 * v - 1);
+
     return normalize(vec3<f32>(
-        pcgf32(seed) * 2.0 - 1.0,
-        pcgf32(seed) * 2.0 - 1.0,
-        pcgf32(seed) * 2.0 - 1.0,
+        sin(phi) * cos(theta),
+        sin(phi) * sin(theta),
+        cos(phi),
     ));
 }

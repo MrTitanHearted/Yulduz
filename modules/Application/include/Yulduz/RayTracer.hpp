@@ -27,7 +27,7 @@ namespace Yulduz {
         void reset();
 
         Options &getOptionsRef();
-        const std::shared_ptr<Framebuffer> &getFinalImage() const;
+        const std::shared_ptr<Framebuffer> &getFinalImageRef() const;
 
        private:
         struct CameraBuffer {

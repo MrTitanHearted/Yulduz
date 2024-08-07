@@ -26,6 +26,7 @@ namespace Yulduz {
         m_EventDispatcher->addCallback<WindowKeyEvent>(std::bind(&App::keyCallback, this, std::placeholders::_1));
         m_EventDispatcher->addCallback<WindowResizeEvent>(std::bind(&App::resizeCallback, this, std::placeholders::_1));
         m_EventDispatcher->addCallback<WindowMouseMoveEvent>(std::bind(&App::mouseMoveCallback, this, std::placeholders::_1));
+        m_EventDispatcher->addCallback<WindowMouseScrollEvent>(std::bind(&App::mouseScrollCallback, this, std::placeholders::_1));
         RenderContext::SetupWGPULogging(WebGPULogLevel::Error);
         InitImGui(m_Context);
         ImGuiIO &io = ImGui::GetIO();
@@ -94,9 +95,7 @@ namespace Yulduz {
             } else {
                 if (m_Window->getCursorMode() != CursorMode::NORMAL)
                     m_Window->setCursorMode(CursorMode::NORMAL);
-                auto [x, y] = m_Window->getMousePosition();
-                m_Camera.setLastX(x);
-                m_Camera.setLastY(y);
+                m_Camera.setFirstMouse(true);
             }
 
             moveCamera();
@@ -113,7 +112,7 @@ namespace Yulduz {
 
             timer.stop();
             m_DeltaTime = timer.getElapsed();
-            m_Time += m_DeltaTime / 1000.0;
+            m_Time += m_DeltaTime;
         }
     }
 
@@ -169,7 +168,7 @@ namespace Yulduz {
 
         ImGui::Separator();
 
-        RayTracer::Options& options = m_RayTracer->getOptionsRef();
+        RayTracer::Options &options = m_RayTracer->getOptionsRef();
 
         ImGui::Checkbox("Accumulate", &options.Accumulate);
         if (ImGui::Button("Reset"))
@@ -178,7 +177,7 @@ namespace Yulduz {
 
         ImGui::Checkbox("Add Sky", &options.AddSky);
         if (options.AddSky)
-            ImGui::ColorPicker3("Sky Color", glm::value_ptr(options.SkyColor));
+            ImGui::ColorEdit3("Sky Color", glm::value_ptr(options.SkyColor));
 
         ImGui::Separator();
 
@@ -193,9 +192,52 @@ namespace Yulduz {
             }
         }
 
+        ImGui::Spacing();
+        ImGui::Spacing();
         ImGui::End();
 
         ImGui::Begin("Scene");
+        ImGui::Spacing();
+        ImGui::Spacing();
+
+        static bool addSphere = false;
+        static bool addMaterial = false;
+        static Sphere dummySphere{};
+        static Material dummyMaterial{};
+
+        ImGui::Checkbox("Add Sphere", &addSphere);
+        if (addSphere) {
+            ImGui::Text("Sphere parameters");
+            ImGui::DragFloat3("Position", glm::value_ptr(dummySphere.Position), 0.1f);
+            ImGui::DragFloat("Radius", &dummySphere.Radius, 0.1f);
+            ImGui::DragInt("Material", &dummySphere.MaterialIndex, 1.0f, 0, static_cast<std::int32_t>(m_Scene.Materials.size() - 1));
+
+            if (ImGui::Button("Reset Default Values"))
+                dummySphere = Sphere{};
+            if (ImGui::Button("Add"))
+                m_Scene.Spheres.emplace_back(dummySphere);
+        }
+        ImGui::Separator();
+        ImGui::Checkbox("Add Material", &addMaterial);
+        if (addMaterial) {
+            ImGui::Text("Material parameters");
+            ImGui::ColorEdit3("Albedo", glm::value_ptr(dummyMaterial.Albedo));
+            ImGui::DragFloat("Roughness", &dummyMaterial.Roughness, 0.05f, 0.0f, 1.0f);
+            ImGui::DragFloat("Metallic", &dummyMaterial.Metallic, 0.05f, 0.0f, 1.0f);
+            ImGui::ColorEdit3("Emission Color", glm::value_ptr(dummyMaterial.EmissionColor));
+            ImGui::DragFloat("Emission Power", &dummyMaterial.EmissionPower, 0.05f, 0.0f, FLT_MAX);
+
+            if (ImGui::Button("Reset Default Values"))
+                dummyMaterial = Material{};
+            if (ImGui::Button("Add"))
+                m_Scene.Materials.emplace_back(dummyMaterial);
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        ImGui::Text("Spheres");
         for (std::size_t i = 0; i < m_Scene.Spheres.size(); i++) {
             ImGui::PushID(i);
 
@@ -208,7 +250,10 @@ namespace Yulduz {
 
             ImGui::PopID();
         }
-
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Text("Materials");
         for (std::size_t i = 0; i < m_Scene.Materials.size(); i++) {
             ImGui::PushID(i);
 
@@ -223,17 +268,21 @@ namespace Yulduz {
 
             ImGui::PopID();
         }
+        ImGui::Spacing();
+        ImGui::Spacing();
         ImGui::End();
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
         ImGui::Begin("Viewport");
+        ImGui::Spacing();
+        ImGui::Spacing();
 
         m_Viewport = ImGui::GetContentRegionAvail();
 
         m_Camera.setAspectRatio(m_Viewport.x / m_Viewport.y);
         m_RayTracer->resize(m_Viewport.x, m_Viewport.y);
 
-        const std::shared_ptr<Framebuffer> &image = m_RayTracer->getFinalImage();
+        std::shared_ptr<Framebuffer> image = m_RayTracer->getFinalImageRef();
         ImGui::Image(image->getView(), ImVec2{static_cast<float>(image->getWidth()), static_cast<float>(image->getHeight())}, ImVec2{0, 1}, ImVec2{1, 0});
 
         ImGui::End();
@@ -277,19 +326,25 @@ namespace Yulduz {
     }
 
     void App::keyCallback(const WindowKeyEvent &event) {
-        if (event.action != KeyAction::PRESS) return;
-        if (event.key == KeyCode::ESCAPE) m_Window->close();
-        if (event.key == KeyCode::R) m_Context->printWGPUReport();
-        if (event.key == KeyCode::T && !m_Window->isMinimized())
-            m_Window->minimize();
-        if (event.key == KeyCode::F) {
-            if (m_Window->isFullscreen())
-                m_Window->makeWindowed();
-            else
-                m_Window->makeFullscreen();
-            auto [width, height] = m_Window->getSize();
-            m_Context->resize(width, height);
-            m_Depthbuffer->resize2D(width, height, m_Context);
+        if (event.action == KeyAction::PRESS) {
+            if (event.key == KeyCode::ESCAPE) m_Window->close();
+            if (event.key == KeyCode::R) m_Context->printWGPUReport();
+            if (event.key == KeyCode::T && !m_Window->isMinimized())
+                m_Window->minimize();
+            if (event.key == KeyCode::F) {
+                if (m_Window->isFullscreen())
+                    m_Window->makeWindowed();
+                else
+                    m_Window->makeFullscreen();
+                auto [width, height] = m_Window->getSize();
+                m_Context->resize(width, height);
+                m_Depthbuffer->resize2D(width, height, m_Context);
+            }
+            if (event.key == KeyCode::LEFT_SHIFT)
+                m_Camera.setSpeed(m_Camera.getSpeed() * 10.0);
+        } else if (event.action == KeyAction::RELEASE) {
+            if (event.key == KeyCode::LEFT_SHIFT)
+                m_Camera.setSpeed(m_Camera.getSpeed() / 10.0);
         }
     }
 
@@ -301,9 +356,16 @@ namespace Yulduz {
     }
 
     void App::mouseMoveCallback(const WindowMouseMoveEvent &event) {
-        if (m_Window->isMouseButtonDown(MouseButton::RIGHT)) {
-            m_Camera.moveMouse(event.x, event.y);
-            m_RayTracer->reset();
-        }
+        if (!m_Window->isMouseButtonDown(MouseButton::RIGHT)) return;
+
+        m_Camera.moveMouse(event.x, event.y);
+        m_RayTracer->reset();
+    }
+
+    void App::mouseScrollCallback(const WindowMouseScrollEvent &event) {
+        if (!m_Window->isMouseButtonDown(MouseButton::RIGHT)) return;
+
+        m_Camera.scrollMouse(event.yOffset);
+        m_RayTracer->reset();
     }
 }  // namespace Yulduz

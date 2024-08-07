@@ -44,5 +44,6 @@ namespace Yulduz {
         void keyCallback(const WindowKeyEvent &event);
         void resizeCallback(const WindowResizeEvent &event);
         void mouseMoveCallback(const WindowMouseMoveEvent &event);
+        void mouseScrollCallback(const WindowMouseScrollEvent &event);
     };
 }  // namespace Yulduz

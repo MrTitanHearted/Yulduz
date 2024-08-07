@@ -155,7 +155,7 @@ namespace Yulduz {
         return m_Options;
     }
 
-    const std::shared_ptr<Framebuffer> &RayTracer::getFinalImage() const {
+    const std::shared_ptr<Framebuffer> &RayTracer::getFinalImageRef() const {
         return m_Framebuffer;
     }
 }  // namespace Yulduz
