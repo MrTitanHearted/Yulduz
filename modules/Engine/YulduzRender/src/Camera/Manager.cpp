@@ -33,15 +33,15 @@ namespace Yulduz {
         m_Camera.scrollMouse(yOffset, zoomMax, zoomMin);
     }
 
-    void CameraManager::setPosition(glm::vec3 position) {
+    void CameraManager::setPosition(const glm::vec3 &position) {
         m_Camera.setPosition(position);
     }
 
-    void CameraManager::setFront(glm::vec3 front) {
+    void CameraManager::setFront(const glm::vec3 &front) {
         m_Camera.setFront(front);
     }
 
-    void CameraManager::setWorldUp(glm::vec3 worldUp) {
+    void CameraManager::setWorldUp(const glm::vec3 &worldUp) {
         m_Camera.setWorldUp(worldUp);
     }
 
@@ -81,17 +81,17 @@ namespace Yulduz {
         m_AspectRatio = aspectRatio;
     }
 
-    CameraManager &CameraManager::withPosition(glm::vec3 position) {
+    CameraManager &CameraManager::withPosition(const glm::vec3 &position) {
         m_Camera.setPosition(position);
         return *this;
     }
 
-    CameraManager &CameraManager::withFront(glm::vec3 front) {
+    CameraManager &CameraManager::withFront(const glm::vec3 &front) {
         m_Camera.setFront(front);
         return *this;
     }
 
-    CameraManager &CameraManager::withWorldUp(glm::vec3 worldUp) {
+    CameraManager &CameraManager::withWorldUp(const glm::vec3 &worldUp) {
         m_Camera.setWorldUp(worldUp);
         return *this;
     }
@@ -145,12 +145,20 @@ namespace Yulduz {
         return m_Camera.getLabel();
     }
 
+    glm::mat4 CameraManager::getProjection() const {
+        return m_Camera.getProjection(m_AspectRatio, m_Near, m_Far);
+    }
+
     glm::mat4 CameraManager::getView() const {
         return m_Camera.getView();
     }
 
-    glm::mat4 CameraManager::getProjection() const {
-        return m_Camera.getProjection(m_AspectRatio, m_Near, m_Far);
+    glm::mat4 CameraManager::getInverseProjection() const {
+        return m_Camera.getInverseProjection(m_AspectRatio, m_Near, m_Far);
+    }
+
+    glm::mat4 CameraManager::getInverseView() const {
+        return m_Camera.getInverseView();
     }
 
     glm::vec3 CameraManager::getPosition() const {

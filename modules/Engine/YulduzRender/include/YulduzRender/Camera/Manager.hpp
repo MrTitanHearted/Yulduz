@@ -14,9 +14,9 @@ namespace Yulduz {
         void moveMouse(float x, float y, bool constrainPitch = true, float constrainValue = 90.0f);
         void scrollMouse(float yOffset, float zoomMax = 45.0f, float zoomMin = 1.0f);
 
-        void setPosition(glm::vec3 position);
-        void setFront(glm::vec3 front);
-        void setWorldUp(glm::vec3 worldUp);
+        void setPosition(const glm::vec3 &position);
+        void setFront(const glm::vec3 &front);
+        void setWorldUp(const glm::vec3 &worldUp);
         void setSpeed(float speed);
         void setSensitivity(float sensitivity);
         void setZoom(float zoom);
@@ -27,9 +27,9 @@ namespace Yulduz {
         void setNear(float zNear);
         void setAspectRatio(float aspectRatio);
 
-        CameraManager &withPosition(glm::vec3 position);
-        CameraManager &withFront(glm::vec3 front);
-        CameraManager &withWorldUp(glm::vec3 worldUp);
+        CameraManager &withPosition(const glm::vec3 &position);
+        CameraManager &withFront(const glm::vec3 &front);
+        CameraManager &withWorldUp(const glm::vec3 &worldUp);
         CameraManager &withSpeed(float speed);
         CameraManager &withSensitivity(float sensitivity);
         CameraManager &withZoom(float zoom);
@@ -43,6 +43,8 @@ namespace Yulduz {
         std::string getLabel() const;
         glm::mat4 getProjection() const;
         glm::mat4 getView() const;
+        glm::mat4 getInverseProjection() const;
+        glm::mat4 getInverseView() const;
 
         glm::vec3 getPosition() const;
         glm::vec3 getFront() const;

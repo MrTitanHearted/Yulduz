@@ -3,8 +3,8 @@
 namespace Yulduz {
     const float Camera::YAW = -90.0f;
     const float Camera::PITCH = 0.0f;
-    const float Camera::SPEED = 500.0f;
-    const float Camera::SENSITIVITY = 0.1f;
+    const float Camera::SPEED = 0.005f;
+    const float Camera::SENSITIVITY = 0.05f;
     const float Camera::ZOOM = 45.0f;
     const glm::vec3 Camera::WORLD_UP = glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -124,6 +124,14 @@ namespace Yulduz {
 
     glm::vec3 Camera::getPosition() const {
         return m_Position;
+    }
+
+    glm::mat4 Camera::getInverseProjection(float aspectRatio, float zNear, float zFar) const {
+        return glm::inverse(glm::perspective(glm::radians(m_Zoom), aspectRatio, zNear, zFar));
+    }
+
+    glm::mat4 Camera::getInverseView() const {
+        return glm::inverse(glm::lookAt(m_Position, m_Position + m_Front, m_Up));
     }
 
     glm::vec3 Camera::getFront() const {

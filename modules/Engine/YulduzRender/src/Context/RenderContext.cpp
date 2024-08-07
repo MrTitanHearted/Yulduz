@@ -16,6 +16,9 @@ namespace Yulduz {
         wgpuDeviceGetLimits(device, &supportedLimits);
         auto [width, height] = window->getSize();
 
+        WGPUAdapterProperties adapterProperties{};
+        wgpuAdapterGetProperties(adapter, &adapterProperties);
+
         m_Label = label;
         m_Instance = instance;
         m_Surface = surface;
@@ -25,6 +28,35 @@ namespace Yulduz {
         m_Config = config;
         m_Limits = supportedLimits.limits;
         m_Window = window;
+        WGPUSurfaceCapabilities caps{};
+        wgpuSurfaceGetCapabilities(surface, adapter, &caps);
+        for (std::size_t i = 0; i < caps.formatCount; i++)
+            m_Caps.Formats.insert(static_cast<TextureFormat>(caps.formats[i]));
+        for (std::size_t i = 0; i < caps.presentModeCount; i++)
+            m_Caps.PresentModes.insert(static_cast<PresentMode>(caps.presentModes[i]));
+        for (std::size_t i = 0; i < caps.alphaModeCount; i++)
+            m_Caps.AlphaModes.insert(static_cast<CompositeAlphaMode>(caps.alphaModes[i]));
+        wgpuSurfaceCapabilitiesFreeMembers(caps);
+        m_AdapterProperties = AdapterProperties{
+            .VendorID = adapterProperties.vendorID,
+            .VendorName = adapterProperties.vendorName,
+            .Architecture = adapterProperties.architecture,
+            .DeviceID = adapterProperties.deviceID,
+            .Name = adapterProperties.name,
+            .DriverDescription = adapterProperties.driverDescription,
+            .AdapterType = static_cast<AdapterType>(adapterProperties.adapterType),
+            .BackendType = static_cast<BackendType>(adapterProperties.backendType),
+        };
+
+        YZDEBUG("Adapter Properties:");
+        YZDEBUG("\tVendorID: {}", m_AdapterProperties.VendorID);
+        YZDEBUG("\tVendorName: {}", m_AdapterProperties.VendorName);
+        YZDEBUG("\tArchitecture: {}", m_AdapterProperties.Architecture);
+        YZDEBUG("\tDeviceID: {}", m_AdapterProperties.DeviceID);
+        YZDEBUG("\tName: {}", m_AdapterProperties.Name);
+        YZDEBUG("\tDriverDescription: {}", m_AdapterProperties.DriverDescription);
+        YZDEBUG("\tAdapterType: {}", GetAdapterType(m_AdapterProperties.AdapterType));
+        YZDEBUG("\tBackendType: {}", GetBackendType(m_AdapterProperties.BackendType));
     }
 
     RenderContext::~RenderContext() {
@@ -37,12 +69,8 @@ namespace Yulduz {
         wgpuInstanceRelease(m_Instance);
     }
 
-    void RenderContext::registerCallbacks(EventDispatcher &eventDispatcher) {
-        eventDispatcher.addCallback<WindowResizeEvent>(std::bind(&RenderContext::windowResizeCallback, this, std::placeholders::_1));
-    }
-
     void RenderContext::resize(std::uint32_t width, std::uint32_t height) {
-        if (width == 0 | height == 0) return;
+        if (width == 0 || height == 0 || (m_Config.width == width && m_Config.height == height)) return;
 
         m_Config.width = width;
         m_Config.height = height;
@@ -66,7 +94,7 @@ namespace Yulduz {
             case WGPUSurfaceGetCurrentTextureStatus_DeviceLost:
                 YZERROR("Failed to get Surface Texture: Device lost");
             case WGPUSurfaceGetCurrentTextureStatus_Force32:
-                YZERROR("Failed to get Turface Texture");
+                YZERROR("Failed to get Surface Texture");
                 return;
         }
 
@@ -115,6 +143,16 @@ namespace Yulduz {
                 YZERROR("Unknown backend type: {}", static_cast<std::uint32_t>(report.backendType));
                 return;
         }
+    }
+
+    void RenderContext::setPresentMode(PresentMode mode) {
+        if (!m_Caps.PresentModes.contains(mode)) {
+            YZWARN("Yulduz Surface does not support Present Mode: '{}'", static_cast<std::uint32_t>(mode));
+            return;
+        }
+
+        m_Config.presentMode = static_cast<WGPUPresentMode>(mode);
+        wgpuSurfaceConfigure(m_Surface, &m_Config);
     }
 
     void RenderContext::SetupWGPULogging(WebGPULogLevel level) {
@@ -256,8 +294,11 @@ namespace Yulduz {
             .powerPreference = static_cast<WGPUPowerPreference>(m_PowerPreference),
             .forceFallbackAdapter = m_ForceFallbackAdapter,
         };
+        WGPUFeatureName feature = static_cast<WGPUFeatureName>(WGPUNativeFeature_TextureAdapterSpecificFormatFeatures);
         WGPUDeviceDescriptor deviceDescriptor{
             .label = m_DeviceLabel.c_str(),
+            .requiredFeatureCount = 1,
+            .requiredFeatures = &feature,
             .defaultQueue = WGPUQueueDescriptor{.label = m_QueueLabel.c_str()},
         };
         wgpuInstanceRequestAdapter(instance, &adapterOptions, WGPURequestAdapterCallback, &adapter);

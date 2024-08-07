@@ -299,6 +299,18 @@ namespace Yulduz {
         };
     }
 
+    ComputeState::ComputeState(const std::shared_ptr<Shader> &shader, const std::string &entryPoint) {
+        m_Shader = shader;
+        m_EntryPoint = entryPoint;
+    }
+
+    WGPUProgrammableStageDescriptor ComputeState::Get(const ComputeState &state) {
+        return WGPUProgrammableStageDescriptor{
+            .module = state.m_Shader->get(),
+            .entryPoint = state.m_EntryPoint.c_str(),
+        };
+    }
+
     PipelineLayout::PipelineLayout(const std::string &label, const WGPUPipelineLayout &layout) {
         YZDEBUG("Initializing Pipeline Layout: '{}'", label);
 
@@ -343,6 +355,32 @@ namespace Yulduz {
     }
 
     std::shared_ptr<PipelineLayout> RenderPipeline::getLayout() const {
+        return m_PipelineLayout;
+    }
+
+    ComputePipeline::ComputePipeline(const std::string &label, const WGPUComputePipeline &pipeline, const std::shared_ptr<PipelineLayout> &layout) {
+        YZDEBUG("Initializing Compute Pipeline: '{}'", label);
+
+        m_Label = label;
+        m_ComputePipeline = pipeline;
+        m_PipelineLayout = layout;
+    }
+
+    ComputePipeline::~ComputePipeline() {
+        YZDEBUG("Releasing Compute Pipeline: '{}'", m_Label);
+
+        wgpuComputePipelineRelease(m_ComputePipeline);
+    }
+
+    std::string ComputePipeline::getLabel() const {
+        return m_Label;
+    }
+
+    WGPUComputePipeline ComputePipeline::get() const {
+        return m_ComputePipeline;
+    }
+
+    std::shared_ptr<PipelineLayout> ComputePipeline::getLayout() const {
         return m_PipelineLayout;
     }
 
@@ -455,5 +493,38 @@ namespace Yulduz {
         WGPURenderPipeline pipeline = wgpuDeviceCreateRenderPipeline(context->getDevice(), &descriptor);
 
         return std::make_shared<RenderPipeline>(m_Label, pipeline, layout);
+    }
+
+    ComputePipelineBuilder::ComputePipelineBuilder() {
+        m_Label = "Yulduz Compute Pipeline";
+    }
+
+    ComputePipelineBuilder &ComputePipelineBuilder::setLabel(const std::string &label) {
+        m_Label = label;
+        return *this;
+    }
+
+    ComputePipelineBuilder &ComputePipelineBuilder::setComputeStateReq(const ComputeState &state) {
+        m_ComputeState = state;
+        return *this;
+    }
+
+    std::shared_ptr<ComputePipeline> ComputePipelineBuilder::build(const std::shared_ptr<PipelineLayout> &layout, const std::shared_ptr<RenderContext> &context) {
+        if (!m_ComputeState) {
+            YZFATAL("Compute Pipeline: '{}' Compute State is not set!", m_Label);
+            throw std::runtime_error("Compute Pipeline: '" + m_Label + "' Compute State is not set!");
+        }
+
+        WGPUProgrammableStageDescriptor computeState = ComputeState::Get(m_ComputeState.value());
+
+        WGPUComputePipelineDescriptor descriptor{
+            .label = m_Label.c_str(),
+            .layout = layout->get(),
+            .compute = computeState,
+        };
+
+        WGPUComputePipeline pipeline = wgpuDeviceCreateComputePipeline(context->getDevice(), &descriptor);
+
+        return std::make_shared<ComputePipeline>(m_Label, pipeline, layout);
     }
 }  // namespace Yulduz

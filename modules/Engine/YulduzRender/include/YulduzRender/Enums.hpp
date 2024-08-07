@@ -419,10 +419,84 @@ namespace Yulduz {
         Left = 1 << 9,
     };
 
+    enum class AdapterType {
+        DiscreteGPU = WGPUAdapterType_DiscreteGPU,
+        IntegratedGPU = WGPUAdapterType_IntegratedGPU,
+        CPU = WGPUAdapterType_CPU,
+        Unknown = WGPUAdapterType_Unknown,
+        Force32 = WGPUAdapterType_Force32,
+    };
+
+    enum class BackendType {
+        Undefined = WGPUBackendType_Undefined,
+        Null = WGPUBackendType_Null,
+        WebGPU = WGPUBackendType_WebGPU,
+        D3D11 = WGPUBackendType_D3D11,
+        D3D12 = WGPUBackendType_D3D12,
+        Metal = WGPUBackendType_Metal,
+        Vulkan = WGPUBackendType_Vulkan,
+        OpenGL = WGPUBackendType_OpenGL,
+        OpenGLES = WGPUBackendType_OpenGLES,
+        Force32 = WGPUBackendType_Force32,
+    };
+
     YULDUZ_ENUM_UINT_BITWISE_OPERATORS(RenderContextBackend);
     YULDUZ_ENUM_UINT_BITWISE_OPERATORS(TextureUsage);
     YULDUZ_ENUM_UINT_BITWISE_OPERATORS(BufferUsage);
     YULDUZ_ENUM_UINT_BITWISE_OPERATORS(ShaderStage);
     YULDUZ_ENUM_UINT_BITWISE_OPERATORS(ColorWriteMask);
     YULDUZ_ENUM_UINT_BITWISE_OPERATORS(CameraMovement);
+
+    static const char *GetAdapterType(AdapterType type) {
+        switch (type) {
+            case AdapterType::DiscreteGPU:
+                return "Discrete GPU";
+            case AdapterType::IntegratedGPU:
+                return "Integrated GPU";
+            case AdapterType::CPU:
+                return "CPU";
+            default:
+                return "Unknown";
+        }
+    }
+
+    static const char *GetBackendType(BackendType type) {
+        switch (type) {
+            case BackendType::Undefined:
+                return "Undefined";
+            case BackendType::Null:
+                return "Null";
+            case BackendType::WebGPU:
+                return "WebGPU";
+            case BackendType::D3D11:
+                return "D3D11";
+            case BackendType::D3D12:
+                return "D3D12";
+            case BackendType::Metal:
+                return "Metal";
+            case BackendType::Vulkan:
+                return "Vulkan";
+            case BackendType::OpenGL:
+                return "OpenGL";
+            case BackendType::OpenGLES:
+                return "OpenGLES";
+            default:
+                return "Unknown";
+        }
+    }
+
+    static const char *GetPresentMode(PresentMode mode) {
+        switch (mode) {
+            case PresentMode::Fifo:
+                return "Fifo";
+            case PresentMode::FifoRelaxed:
+                return "Fifo Relaxed";
+            case PresentMode::Immediate:
+                return "Immediate";
+            case PresentMode::Mailbox:
+                return "Mailbox";
+            default:
+                return "Unknown";
+        }
+    }
 }  // namespace Yulduz

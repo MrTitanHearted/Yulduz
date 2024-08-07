@@ -167,4 +167,20 @@ namespace Yulduz {
     };
 
     YULDUZ_ENUM_UINT_BITWISE_OPERATORS(KeyMod);
+
+    const char *GetKeyName(KeyCode key);
+    const char *GetButtonName(MouseButton button);
+
+    static const char *GetCursorMode(CursorMode mode) {
+        switch (mode) {
+            case CursorMode::NORMAL:
+                return "Normal";
+            case CursorMode::HIDDEN:
+                return "Hidden";
+            case CursorMode::DISABLED:
+                return "Disabled";
+            case CursorMode::CAPTURED:
+                return "Captured";
+        }
+    }
 }  // namespace Yulduz

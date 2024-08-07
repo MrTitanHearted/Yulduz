@@ -14,7 +14,7 @@ namespace Yulduz {
             bool Resizable = true;
             bool Fullscreen = false;
             bool FullscreenSize = true;
-            std::optional<std::reference_wrapper<EventDispatcher>> EventDispatcher = std::nullopt;
+            std::reference_wrapper<std::shared_ptr<EventDispatcher>> EventDispatcher;
         };
 
        public:
@@ -23,13 +23,13 @@ namespace Yulduz {
         static std::shared_ptr<Window> New(const Settings &settings);
 
        public:
-        Window(GLFWwindow *window);
+        Window(GLFWwindow *window, const std::shared_ptr<EventDispatcher> &dispatcher);
         ~Window();
 
         Window(const Window &) = delete;
         Window &operator=(const Window &) = delete;
 
-        void registerCallbacks(EventDispatcher &dispatcher);
+        void setTitle(const std::string &title);
         void setSize(std::uint32_t width, std::uint32_t height);
         void setWidth(std::uint32_t width);
         void setHeight(std::uint32_t height);
@@ -37,15 +37,18 @@ namespace Yulduz {
         void maximize();
         void minimize();
         void restore();
+        void close();
         void makeFullscreen(bool screenSize = true);
         void makeWindowed();
-        void close();
 
         GLFWwindow *get() const;
         std::string getTitle() const;
         std::array<std::uint32_t, 2> getSize() const;
         std::uint32_t getWidth() const;
         std::uint32_t getHeight() const;
+        std::array<std::uint32_t, 2> getPosition() const;
+        std::uint32_t getX() const;
+        std::uint32_t getY() const;
         std::array<double, 2> getMousePosition() const;
         std::uint32_t getMouseX() const;
         std::uint32_t getMouseY() const;
@@ -75,9 +78,11 @@ namespace Yulduz {
 
        private:
         GLFWwindow *m_Window;
-        std::optional<std::reference_wrapper<EventDispatcher>> m_Dispatcher;
+        std::shared_ptr<EventDispatcher> m_Dispatcher;
         std::uint32_t m_PrevWidth;
         std::uint32_t m_PrevHeight;
+        std::uint32_t m_PrevX;
+        std::uint32_t m_PrevY;
 
         KeyMod m_KeyMods;
         bool m_Keys[GLFW_KEY_LAST + 1];
@@ -85,7 +90,7 @@ namespace Yulduz {
 
         static GlfwState g_GlfwState;
 
-    private:
+       private:
 #if defined(YULDUZ_BUILD_TYPE_DEBUG)
         void closeCallback(const WindowCloseEvent &event);
         void resizeCallback(const WindowResizeEvent &event);

@@ -15,7 +15,7 @@ namespace Yulduz {
         return WGPUBindGroupLayoutEntry{
             .binding = binding,
             .visibility = static_cast<WGPUShaderStageFlags>(m_ShaderStage),
-            .buffer = {
+            .buffer = WGPUBufferBindingLayout{
                 .type = WGPUBufferBindingType_Storage,
             },
         };
@@ -25,7 +25,7 @@ namespace Yulduz {
         return WGPUBindGroupLayoutEntry{
             .binding = binding,
             .visibility = static_cast<WGPUShaderStageFlags>(m_ShaderStage),
-            .buffer = {
+            .buffer = WGPUBufferBindingLayout{
                 .type = WGPUBufferBindingType_Uniform,
             },
         };
@@ -103,7 +103,7 @@ namespace Yulduz {
 
     StorageTextureEntry::StorageTextureEntry(ShaderStage stage, TextureFormat format) {
         m_ShaderStage = stage;
-        m_StorageTextureAccess = StorageTextureAccess::ReadWrite;
+        m_StorageTextureAccess = StorageTextureAccess::WriteOnly;
         m_TextureFormat = format;
     }
 

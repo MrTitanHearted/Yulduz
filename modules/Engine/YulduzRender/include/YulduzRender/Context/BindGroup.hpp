@@ -125,10 +125,10 @@ namespace Yulduz {
         BindGroupLayoutBuilder &addStorageTexture3D(std::uint32_t binding, const StorageTextureEntry &entry);
 
         inline BindGroupLayoutBuilder &addStorageBuffer(std::uint32_t binding) {
-            return addStorageBuffer(binding, BufferEntry(ShaderStage::Vertex | ShaderStage::Fragment | ShaderStage::Compute));
+            return addStorageBuffer(binding, BufferEntry(ShaderStage::Fragment | ShaderStage::Compute));
         }
         inline BindGroupLayoutBuilder &addUniformBuffer(std::uint32_t binding) {
-            return addUniformBuffer(binding, BufferEntry(ShaderStage::Vertex | ShaderStage::Fragment | ShaderStage::Compute));
+            return addUniformBuffer(binding, BufferEntry(ShaderStage::Fragment | ShaderStage::Compute));
         }
         inline BindGroupLayoutBuilder &addSampler(std::uint32_t binding) {
             return addSampler(binding, SamplerEntry(ShaderStage::Fragment));

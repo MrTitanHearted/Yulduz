@@ -7,13 +7,14 @@ namespace Yulduz {
     }
 
     App::App()
-        : m_Camera{45.0f, 0.1f, 100.0f},
-          m_DeltaTime{0},
+        : m_DeltaTime{0},
           m_EventDispatchTime{0},
-          m_CameraTime{0},
           m_ImGuiTime{0},
           m_RenderTime{0},
-          m_RayTracingTime{0} {
+          m_ImGuiPassTime{0},
+          m_CommandSubmissionTime{0},
+          m_Time{0} {
+        m_EventDispatcher = std::make_shared<EventDispatcher>();
         m_Window = Window::New(Window::Settings{
             .Title = "Yulduz Cherno Raytracing",
             .Width = 1200,
@@ -22,9 +23,9 @@ namespace Yulduz {
         });
         auto [width, height] = m_Window->getSize();
         m_Context = RenderContextBuilder::New().build(m_Window);
-        m_Context->registerCallbacks(m_EventDispatcher);
-        m_EventDispatcher.addCallback<WindowKeyEvent>(std::bind(&App::keyCallback, this, std::placeholders::_1));
-        m_EventDispatcher.addCallback<WindowResizeEvent>(std::bind(&App::resizeCallback, this, std::placeholders::_1));
+        m_EventDispatcher->addCallback<WindowKeyEvent>(std::bind(&App::keyCallback, this, std::placeholders::_1));
+        m_EventDispatcher->addCallback<WindowResizeEvent>(std::bind(&App::resizeCallback, this, std::placeholders::_1));
+        m_EventDispatcher->addCallback<WindowMouseMoveEvent>(std::bind(&App::mouseMoveCallback, this, std::placeholders::_1));
         RenderContext::SetupWGPULogging(WebGPULogLevel::Error);
         InitImGui(m_Context);
         ImGuiIO &io = ImGui::GetIO();
@@ -33,7 +34,7 @@ namespace Yulduz {
                             .setLabel("ImGui Depthbuffer")
                             .setFormat(TextureFormat::Depth32Float)
                             .emptyFramebuffer(width, height, m_Context);
-        m_Renderer.setRenderContext(m_Context);
+        m_RayTracer = std::make_shared<RayTracer>(RayTracer::Settings{.RenderContext = m_Context});
 
         m_Scene.Materials.emplace_back(Material{
             .Albedo = glm::vec3{1.0f, 0.0f, 1.0f},
@@ -45,8 +46,8 @@ namespace Yulduz {
         });
         Material &orangeSphere = m_Scene.Materials.emplace_back(Material{
             .Albedo = glm::vec3{0.8f, 0.5f, 0.2f},
-            .Roughness = 0.1f,
             .EmissionPower = 2.0f,
+            .Roughness = 0.1f,
         });
         orangeSphere.EmissionColor = orangeSphere.Albedo;
 
@@ -65,6 +66,8 @@ namespace Yulduz {
             .Radius = 100.0f,
             .MaterialIndex = 1,
         });
+
+        m_Camera.setPosition(glm::vec3{0, 0, 6});
     }
 
     App::~App() {
@@ -75,7 +78,6 @@ namespace Yulduz {
         while (m_Window->isRunning()) {
             static Milliseconds::Timer timer;
             static Milliseconds::Timer eventTimer;
-            static Milliseconds::Timer cameraTimer;
             static Milliseconds::Timer imguiTimer;
             static Milliseconds::Timer renderTimer;
 
@@ -83,14 +85,21 @@ namespace Yulduz {
 
             eventTimer.start();
             Window::PollEvents();
-            m_EventDispatcher.dispatch();
+            m_EventDispatcher->dispatch();
             eventTimer.stop();
             m_EventDispatchTime = eventTimer.getElapsed();
 
-            cameraTimer.start();
-            if (m_Camera.OnUpdate(m_DeltaTime, m_Window)) m_Renderer.resetFrameIndex();
-            cameraTimer.stop();
-            m_CameraTime = cameraTimer.getElapsed();
+            if (m_Window->isMouseButtonDown(MouseButton::RIGHT)) {
+                m_Window->setCursorMode(CursorMode::DISABLED);
+            } else {
+                if (m_Window->getCursorMode() != CursorMode::NORMAL)
+                    m_Window->setCursorMode(CursorMode::NORMAL);
+                auto [x, y] = m_Window->getMousePosition();
+                m_Camera.setLastX(x);
+                m_Camera.setLastY(y);
+            }
+
+            moveCamera();
 
             imguiTimer.start();
             ImGuiFrame(std::bind(&App::renderImGui, this));
@@ -104,12 +113,27 @@ namespace Yulduz {
 
             timer.stop();
             m_DeltaTime = timer.getElapsed();
+            m_Time += m_DeltaTime / 1000.0;
         }
     }
 
     void App::renderFrame(const std::shared_ptr<Framebuffer> &frame) {
+        static Milliseconds::Timer computePassTimer;
+        static Milliseconds::Timer imguiPassTimer;
+        static Milliseconds::Timer commandSubmissionTimer;
+
         std::vector<std::shared_ptr<CommandBuffer>> commands;
         std::shared_ptr<CommandEncoder> encoder = CommandEncoderBuilder::New().build(m_Context);
+
+        computePassTimer.start();
+        m_RayTracer->updateSceneBuffers(m_Scene);
+        std::shared_ptr<ComputePass> computePass = ComputePassBuilder::New().build(encoder);
+        m_RayTracer->render(m_Time, m_Camera, computePass);
+        computePass->finish();
+        computePassTimer.stop();
+        m_ComputePassTime = computePassTimer.getElapsed();
+
+        imguiPassTimer.start();
         std::shared_ptr<RenderPass> renderPass =
             RenderPassBuilder::New()
                 .setLabel("Yulduz ImGui Render Pass")
@@ -118,47 +142,59 @@ namespace Yulduz {
                 .build(encoder);
         RenderImGui(renderPass);
         renderPass->finish();
+        imguiPassTimer.stop();
+        m_ImGuiPassTime = imguiPassTimer.getElapsed();
 
         commands.emplace_back(encoder->finish());
 
+        commandSubmissionTimer.start();
         m_Context->submitCommands(commands);
+        commandSubmissionTimer.stop();
+        m_CommandSubmissionTime = commandSubmissionTimer.getElapsed();
     }
 
     void App::renderImGui() {
-        updateFramedata();
         ImGuiIO &io = ImGui::GetIO();
         ImGui::DockSpaceOverViewport();
         ImGui::PushFont(m_Font);
 
-        static Milliseconds::Timer settingsTimer;
-        static Milliseconds::Timer sceneTimer;
-        static Milliseconds::Timer viewportTimer;
-        static double settingsTime;
-        static double sceneTime;
-        static double viewportTime;
-
-        settingsTimer.start();
         ImGui::Begin("Settings");
         ImGui::Text("Delta Time: %.3fms", m_DeltaTime);
         ImGui::Text("Event Dispatch Time: %.3fms", m_EventDispatchTime);
-        ImGui::Text("Camera Time: %.3fms", m_CameraTime);
         ImGui::Text("ImGui Time: %.3fms", m_ImGuiTime);
-        ImGui::Text("\tSettings Time: %.3fms", settingsTime);
-        ImGui::Text("\tScene Time: %.3fms", sceneTime);
-        ImGui::Text("\tViewport Time: %.3fms", viewportTime);
-        ImGui::Text("\tRayTracing Time: %.3fms", m_RayTracingTime);
         ImGui::Text("Render Time: %.3fms", m_RenderTime);
-        if (ImGui::Button("Render"))
-            updateFramedata();
-        ImGui::Checkbox("Accumulate", &m_Renderer.getSettings().Accumulate);
-        ImGui::Checkbox("Slow Random", &m_Renderer.getSettings().SlowRandom);
-        if (ImGui::Button("Reset"))
-            m_Renderer.resetFrameIndex();
-        ImGui::End();
-        settingsTimer.stop();
-        settingsTime = settingsTimer.getElapsed();
+        ImGui::Text("\tCompute Pass Time: %.3fms", m_ComputePassTime);
+        ImGui::Text("\tImGui Pass Time: %.3fms", m_ImGuiPassTime);
+        ImGui::Text("\tCommand Submission Time: %.3fms", m_CommandSubmissionTime);
 
-        sceneTimer.start();
+        ImGui::Separator();
+
+        RayTracer::Options& options = m_RayTracer->getOptionsRef();
+
+        ImGui::Checkbox("Accumulate", &options.Accumulate);
+        if (ImGui::Button("Reset"))
+            m_RayTracer->reset();
+        ImGui::DragInt("Max Ray Bounces", &options.Bounces, 1, 1, 50);
+
+        ImGui::Checkbox("Add Sky", &options.AddSky);
+        if (options.AddSky)
+            ImGui::ColorPicker3("Sky Color", glm::value_ptr(options.SkyColor));
+
+        ImGui::Separator();
+
+        ImGui::Text("Current Present Mode: %s", GetPresentMode(m_Context->getPresentMode()));
+        ImGui::Text("Present Modes");
+        SurfaceCapabilities caps = m_Context->getSurfaceCapabilities();
+        static std::uint32_t selected = static_cast<std::uint32_t>(m_Context->getPresentMode());
+        for (const PresentMode &mode : caps.PresentModes) {
+            if (ImGui::Selectable(GetPresentMode(mode), selected == static_cast<std::uint32_t>(mode)) && m_Context->getPresentMode() != mode) {
+                selected = static_cast<std::uint32_t>(mode);
+                m_Context->setPresentMode(mode);
+            }
+        }
+
+        ImGui::End();
+
         ImGui::Begin("Scene");
         for (std::size_t i = 0; i < m_Scene.Spheres.size(); i++) {
             ImGui::PushID(i);
@@ -188,54 +224,86 @@ namespace Yulduz {
             ImGui::PopID();
         }
         ImGui::End();
-        sceneTimer.stop();
-        sceneTime = sceneTimer.getElapsed();
 
-        viewportTimer.start();
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
         ImGui::Begin("Viewport");
 
         m_Viewport = ImGui::GetContentRegionAvail();
 
-        std::shared_ptr<Framebuffer> image = m_Renderer.getFinalImage();
-        if (image)
-            ImGui::Image(image->getView(), ImVec2{static_cast<float>(image->getWidth()), static_cast<float>(image->getHeight())}, ImVec2{0, 1}, ImVec2{1, 0});
+        m_Camera.setAspectRatio(m_Viewport.x / m_Viewport.y);
+        m_RayTracer->resize(m_Viewport.x, m_Viewport.y);
+
+        const std::shared_ptr<Framebuffer> &image = m_RayTracer->getFinalImage();
+        ImGui::Image(image->getView(), ImVec2{static_cast<float>(image->getWidth()), static_cast<float>(image->getHeight())}, ImVec2{0, 1}, ImVec2{1, 0});
 
         ImGui::End();
         ImGui::PopStyleVar();
-        viewportTimer.stop();
-        viewportTime = viewportTimer.getElapsed();
 
         ImGui::PopFont();
     }
 
-    void App::updateFramedata() {
-        if (m_Viewport.x == 0 || m_Viewport.y == 0) return;
+    void App::moveCamera() {
+        if (!m_Window->isMouseButtonDown(MouseButton::RIGHT)) return;
 
-        static Milliseconds::Timer rayTracingTimer;
-        rayTracingTimer.start();
+        bool reset = false;
+        if (m_Window->isKeyDown(KeyCode::W)) {
+            m_Camera.move(CameraMovement::WorldForward, m_DeltaTime);
+            reset = true;
+        }
+        if (m_Window->isKeyDown(KeyCode::S)) {
+            m_Camera.move(CameraMovement::WorldBackward, m_DeltaTime);
+            reset = true;
+        }
+        if (m_Window->isKeyDown(KeyCode::D)) {
+            m_Camera.move(CameraMovement::Right, m_DeltaTime);
+            reset = true;
+        }
+        if (m_Window->isKeyDown(KeyCode::A)) {
+            m_Camera.move(CameraMovement::Left, m_DeltaTime);
+            reset = true;
+        }
+        if (m_Window->isKeyDown(KeyCode::E)) {
+            m_Camera.move(CameraMovement::WorldUp, m_DeltaTime);
+            reset = true;
+        }
+        if (m_Window->isKeyDown(KeyCode::Q)) {
+            m_Camera.move(CameraMovement::WorldDown, m_DeltaTime);
+            reset = true;
+        }
 
-        m_Renderer.resize(m_Viewport.x, m_Viewport.y);
-        m_Camera.OnResize(m_Viewport.x, m_Viewport.y);
-        m_Renderer.render(m_Scene, m_Camera);
-
-        rayTracingTimer.stop();
-
-        m_RayTracingTime = rayTracingTimer.getElapsed();
+        if (reset) {
+            m_RayTracer->reset();
+        }
     }
 
     void App::keyCallback(const WindowKeyEvent &event) {
         if (event.action != KeyAction::PRESS) return;
         if (event.key == KeyCode::ESCAPE) m_Window->close();
         if (event.key == KeyCode::R) m_Context->printWGPUReport();
+        if (event.key == KeyCode::T && !m_Window->isMinimized())
+            m_Window->minimize();
+        if (event.key == KeyCode::F) {
+            if (m_Window->isFullscreen())
+                m_Window->makeWindowed();
+            else
+                m_Window->makeFullscreen();
+            auto [width, height] = m_Window->getSize();
+            m_Context->resize(width, height);
+            m_Depthbuffer->resize2D(width, height, m_Context);
+        }
     }
 
     void App::resizeCallback(const WindowResizeEvent &event) {
         ImGui_ImplWGPU_InvalidateDeviceObjects();
-        m_Depthbuffer = TextureBuilder::New()
-                            .setLabel("Yulduz Context Depth Buffer")
-                            .setFormat(TextureFormat::Depth32Float)
-                            .emptyFramebuffer(event.width, event.height, m_Context);
+        m_Context->resize(event.width, event.height);
+        m_Depthbuffer->resize2D(event.width, event.height, m_Context);
         ImGui_ImplWGPU_CreateDeviceObjects();
+    }
+
+    void App::mouseMoveCallback(const WindowMouseMoveEvent &event) {
+        if (m_Window->isMouseButtonDown(MouseButton::RIGHT)) {
+            m_Camera.moveMouse(event.x, event.y);
+            m_RayTracer->reset();
+        }
     }
 }  // namespace Yulduz

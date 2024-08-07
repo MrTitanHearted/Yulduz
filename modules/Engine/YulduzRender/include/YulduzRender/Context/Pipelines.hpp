@@ -144,6 +144,18 @@ namespace Yulduz {
         std::vector<WGPUColorTargetState> m_WGPUColorTargetStates;
     };
 
+    class ComputeState {
+       public:
+        ComputeState(const std::shared_ptr<Shader> &shader, const std::string &entryPoint = "cs_main");
+        ~ComputeState() = default;
+
+        static WGPUProgrammableStageDescriptor Get(const ComputeState &state);
+
+       private:
+        std::string m_EntryPoint;
+        std::shared_ptr<Shader> m_Shader;
+    };
+
     class PipelineLayout {
        public:
         PipelineLayout(const std::string &label, const WGPUPipelineLayout &layout);
@@ -169,6 +181,21 @@ namespace Yulduz {
        private:
         std::string m_Label;
         WGPURenderPipeline m_RenderPipeline;
+        std::shared_ptr<PipelineLayout> m_PipelineLayout;
+    };
+
+    class ComputePipeline {
+       public:
+        ComputePipeline(const std::string &label, const WGPUComputePipeline &pipeline, const std::shared_ptr<PipelineLayout> &layout);
+        ~ComputePipeline();
+
+        std::string getLabel() const;
+        WGPUComputePipeline get() const;
+        std::shared_ptr<PipelineLayout> getLayout() const;
+
+       private:
+        std::string m_Label;
+        WGPUComputePipeline m_ComputePipeline;
         std::shared_ptr<PipelineLayout> m_PipelineLayout;
     };
 
@@ -214,5 +241,22 @@ namespace Yulduz {
         std::optional<VertexState> m_VertexState;
         std::optional<FragmentState> m_FragmentState;
         std::optional<DepthStencilState> m_DepthStencilState;
+    };
+
+    class ComputePipelineBuilder {
+       public:
+        ComputePipelineBuilder();
+        ~ComputePipelineBuilder() = default;
+
+        inline static ComputePipelineBuilder New() { return ComputePipelineBuilder(); }
+
+        ComputePipelineBuilder &setLabel(const std::string &label);
+        ComputePipelineBuilder &setComputeStateReq(const ComputeState &state);
+
+        std::shared_ptr<ComputePipeline> build(const std::shared_ptr<PipelineLayout> &layout, const std::shared_ptr<RenderContext> &context);
+
+       private:
+        std::string m_Label;
+        std::optional<ComputeState> m_ComputeState;
     };
 }  // namespace Yulduz

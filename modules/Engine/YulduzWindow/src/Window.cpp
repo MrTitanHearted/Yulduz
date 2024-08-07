@@ -31,20 +31,13 @@ namespace Yulduz {
 
         glfwShowWindow(glfwWindow);
 
-        std::shared_ptr<Window> window = std::make_shared<Window>(glfwWindow);
-        if (settings.EventDispatcher) {
-            window->registerCallbacks(settings.EventDispatcher.value());
-        }
-
+        std::shared_ptr<Window> window = std::make_shared<Window>(glfwWindow, settings.EventDispatcher);
         return window;
     }
 
-    Window::Window(GLFWwindow *window)
-        : m_Window(window), m_Dispatcher(std::nullopt) {
+    Window::Window(GLFWwindow *window, const std::shared_ptr<EventDispatcher> &dispatcher)
+        : m_Window(window), m_Dispatcher(dispatcher) {
         YZDEBUG("Initializing Window: '{}'", glfwGetWindowTitle(window));
-
-        m_PrevWidth = 0;
-        m_PrevHeight = 0;
 
         glfwSetWindowUserPointer(m_Window, this);
         glfwSetWindowCloseCallback(m_Window, GlfwWindowCloseCallback);
@@ -73,6 +66,35 @@ namespace Yulduz {
         m_KeyMods = KeyMod::NONE;
         std::fill(std::begin(m_Keys), std::end(m_Keys), false);
         std::fill(std::begin(m_MouseButtons), std::end(m_MouseButtons), false);
+
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
+        m_Dispatcher->addCallback<WindowCloseEvent>(std::bind(&Window::closeCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowResizeEvent>(std::bind(&Window::resizeCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowMoveEvent>(std::bind(&Window::moveCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowContentScaleEvent>(std::bind(&Window::contentScaleCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowMouseMoveEvent>(std::bind(&Window::mouseMoveCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowMaximizeEvent>(std::bind(&Window::maximizeCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowMinimizeEvent>(std::bind(&Window::minimizeCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowGainFocusEvent>(std::bind(&Window::gainFocusCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowLoseFocusEvent>(std::bind(&Window::loseFocusCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowKeyEvent>(std::bind(&Window::keyCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowCharEvent>(std::bind(&Window::charCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowMouseButtonEvent>(std::bind(&Window::mouseButtonCallback, this, std::placeholders::_1));
+        m_Dispatcher->addCallback<WindowMouseScrollEvent>(std::bind(&Window::mouseScrollCallback, this, std::placeholders::_1));
+#endif
+
+        m_PrevWidth = 0;
+        m_PrevHeight = 0;
+        m_PrevX = 0;
+        m_PrevY = 0;
+
+        if (isFullscreen()) {
+            auto [width, height] = getSize();
+            m_PrevWidth = width / 2;
+            m_PrevHeight = height / 2;
+            m_PrevX = width / 2 - m_PrevWidth / 2;
+            m_PrevY = height / 2 - m_PrevHeight / 2;
+        }
     }
 
     Window::~Window() {
@@ -81,25 +103,8 @@ namespace Yulduz {
         glfwDestroyWindow(m_Window);
     }
 
-    void Window::registerCallbacks(EventDispatcher &dispatcher) {
-        if (m_Dispatcher) return;
-
-        m_Dispatcher = dispatcher;
-#if defined(YULDUZ_BUILD_TYPE_DEBUG)
-        dispatcher.addCallback<WindowCloseEvent>(std::bind(&Window::closeCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowResizeEvent>(std::bind(&Window::resizeCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowMoveEvent>(std::bind(&Window::moveCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowContentScaleEvent>(std::bind(&Window::contentScaleCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowMouseMoveEvent>(std::bind(&Window::mouseMoveCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowMaximizeEvent>(std::bind(&Window::maximizeCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowMinimizeEvent>(std::bind(&Window::minimizeCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowGainFocusEvent>(std::bind(&Window::gainFocusCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowLoseFocusEvent>(std::bind(&Window::loseFocusCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowKeyEvent>(std::bind(&Window::keyCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowCharEvent>(std::bind(&Window::charCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowMouseButtonEvent>(std::bind(&Window::mouseButtonCallback, this, std::placeholders::_1));
-        dispatcher.addCallback<WindowMouseScrollEvent>(std::bind(&Window::mouseScrollCallback, this, std::placeholders::_1));
-#endif
+    void Window::setTitle(const std::string &title) {
+        glfwSetWindowTitle(m_Window, title.c_str());
     }
 
     void Window::setSize(std::uint32_t width, std::uint32_t height) {
@@ -134,10 +139,17 @@ namespace Yulduz {
         glfwRestoreWindow(m_Window);
     }
 
+    void Window::close() {
+        glfwSetWindowShouldClose(m_Window, GLFW_TRUE);
+    }
+
     void Window::makeFullscreen(bool screenSize) {
         auto [width, height] = getSize();
+        auto [x, y] = getPosition();
         m_PrevWidth = width;
         m_PrevHeight = height;
+        m_PrevX = x;
+        m_PrevY = y;
 
         GLFWmonitor *monitor = glfwGetPrimaryMonitor();
         const GLFWvidmode *mode = glfwGetVideoMode(monitor);
@@ -151,13 +163,7 @@ namespace Yulduz {
     void Window::makeWindowed() {
         GLFWmonitor *monitor = glfwGetPrimaryMonitor();
         const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-        std::uint32_t x = mode->width / 2 - m_PrevWidth / 2;
-        std::uint32_t y = mode->height / 2 - m_PrevHeight / 2;
-        glfwSetWindowMonitor(m_Window, nullptr, x, y, m_PrevWidth, m_PrevHeight, mode->refreshRate);
-    }
-
-    void Window::close() {
-        glfwSetWindowShouldClose(m_Window, GLFW_TRUE);
+        glfwSetWindowMonitor(m_Window, nullptr, m_PrevX, m_PrevY, m_PrevWidth, m_PrevHeight, mode->refreshRate);
     }
 
     GLFWwindow *Window::get() const {
@@ -184,6 +190,24 @@ namespace Yulduz {
         std::int32_t height;
         glfwGetWindowSize(m_Window, nullptr, &height);
         return height;
+    }
+
+    std::array<std::uint32_t, 2> Window::getPosition() const {
+        std::int32_t x, y;
+        glfwGetWindowPos(m_Window, &x, &y);
+        return {static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)};
+    }
+
+    std::uint32_t Window::getX() const {
+        std::int32_t x;
+        glfwGetWindowPos(m_Window, &x, nullptr);
+        return x;
+    }
+
+    std::uint32_t Window::getY() const {
+        std::int32_t y;
+        glfwGetWindowPos(m_Window, nullptr, &y);
+        return y;
     }
 
     std::array<double, 2> Window::getMousePosition() const {
@@ -272,5 +296,4 @@ namespace Yulduz {
 
         glfwTerminate();
     }
-
 }  // namespace Yulduz

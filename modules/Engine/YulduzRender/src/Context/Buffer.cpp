@@ -347,11 +347,11 @@ namespace Yulduz {
         return *this;
     }
 
-    std::shared_ptr<StorageBuffer> StorageBufferBuilder::empty(std::size_t count, const std::shared_ptr<RenderContext> &context) {
+    std::shared_ptr<StorageBuffer> StorageBufferBuilder::empty(std::size_t size, const std::shared_ptr<RenderContext> &context) {
         WGPUBufferDescriptor descriptor{
             .label = m_Label.c_str(),
             .usage = static_cast<WGPUBufferUsageFlags>(m_BufferUsage) | WGPUBufferUsage_CopyDst | WGPUBufferUsage_Storage,
-            .size = sizeof(float) * count,
+            .size = size,
         };
 
         WGPUBuffer buffer = wgpuDeviceCreateBuffer(context->getDevice(), &descriptor);
@@ -391,11 +391,11 @@ namespace Yulduz {
         return *this;
     }
 
-    std::shared_ptr<UniformBuffer> UniformBufferBuilder::empty(std::size_t count, const std::shared_ptr<RenderContext> &context) {
+    std::shared_ptr<UniformBuffer> UniformBufferBuilder::empty(std::size_t size, const std::shared_ptr<RenderContext> &context) {
         WGPUBufferDescriptor descriptor{
             .label = m_Label.c_str(),
             .usage = static_cast<WGPUBufferUsageFlags>(m_BufferUsage) | WGPUBufferUsage_CopyDst | WGPUBufferUsage_Uniform,
-            .size = sizeof(float) * count,
+            .size = size,
         };
 
         WGPUBuffer buffer = wgpuDeviceCreateBuffer(context->getDevice(), &descriptor);

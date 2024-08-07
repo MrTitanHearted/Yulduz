@@ -4,6 +4,12 @@ project(Yulduz)
 
 file(COPY ${CMAKE_SOURCE_DIR}/assets DESTINATION ${CMAKE_BINARY_DIR})
 
+if(MSVC)
+    file(GLOB_RECURSE ASSET_FILES ${CMAKE_SOURCE_DIR}/assets/*)
+    add_custom_target(Assets SOURCES ${ASSET_FILES})
+    source_group(TREE ${CMAKE_SOURCE_DIR}/assets PREFIX "assets" FILES ${ASSET_FILES})
+endif()
+
 file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp)
 
 add_executable(Yulduz ${SOURCES})

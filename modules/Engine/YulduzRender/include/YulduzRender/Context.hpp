@@ -7,6 +7,7 @@
 #include <YulduzRender/Context/BindGroup.hpp>
 #include <YulduzRender/Context/Buffer.hpp>
 #include <YulduzRender/Context/CommandEncoder.hpp>
+#include <YulduzRender/Context/ComputePass.hpp>
 #include <YulduzRender/Context/Pipelines.hpp>
 #include <YulduzRender/Context/RenderBundle.hpp>
 #include <YulduzRender/Context/RenderContext.hpp>

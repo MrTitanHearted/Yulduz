@@ -3,10 +3,27 @@
 #include <Yulduz/Core.hpp>
 #include <Yulduz/Window.hpp>
 #include <YulduzRender/Enums.hpp>
-#include <YulduzRender/Context/Texture.hpp>
 
 namespace Yulduz {
     class CommandBuffer;
+    class Framebuffer;
+
+    struct AdapterProperties {
+        std::uint32_t VendorID;
+        std::string VendorName;
+        std::string Architecture;
+        std::uint32_t DeviceID;
+        std::string Name;
+        std::string DriverDescription;
+        AdapterType AdapterType;
+        BackendType BackendType;
+    };
+
+    struct SurfaceCapabilities {
+        std::unordered_set<TextureFormat> Formats;
+        std::unordered_set<PresentMode> PresentModes;
+        std::unordered_set<CompositeAlphaMode> AlphaModes;
+    };
 
     class RenderContext : public std::enable_shared_from_this<RenderContext> {
        public:
@@ -19,11 +36,11 @@ namespace Yulduz {
                       WGPUSurfaceConfiguration config);
         ~RenderContext();
 
-        void registerCallbacks(EventDispatcher &eventDispatcher);
         void resize(std::uint32_t width, std::uint32_t height);
         void renderFrameOnSurface(std::function<void(const std::shared_ptr<Framebuffer> &texture)> frameCallback);
         void submitCommands(const std::vector<std::shared_ptr<CommandBuffer>> &commands) const;
         void printWGPUReport() const;
+        void setPresentMode(PresentMode mode);
 
         inline std::string getLabel() const { return m_Label; }
         inline WGPUInstance getInstance() const { return m_Instance; }
@@ -35,6 +52,11 @@ namespace Yulduz {
         inline WGPULimits getLimits() const { return m_Limits; }
         inline std::shared_ptr<Window> getWindow() const { return m_Window; }
         inline TextureFormat getSurfaceFormat() const { return static_cast<TextureFormat>(m_Config.format); }
+        inline PresentMode getPresentMode() const { return static_cast<PresentMode>(m_Config.presentMode); }
+        inline CompositeAlphaMode getAlphaMode() const { return static_cast<CompositeAlphaMode>(m_Config.alphaMode); }
+        inline TextureFormat getPreferredSurfaceFormat() const { return static_cast<TextureFormat>(wgpuSurfaceGetPreferredFormat(m_Surface, m_Adapter)); }
+        inline AdapterProperties getAdapterProperties() const { return m_AdapterProperties; }
+        inline SurfaceCapabilities getSurfaceCapabilities() const { return m_Caps; }
 
         static void SetupWGPULogging(WebGPULogLevel level);
 
@@ -48,6 +70,8 @@ namespace Yulduz {
         WGPUSurfaceConfiguration m_Config;
         WGPULimits m_Limits;
         std::shared_ptr<Window> m_Window;
+        SurfaceCapabilities m_Caps;
+        AdapterProperties m_AdapterProperties;
 
        private:
         void windowResizeCallback(const WindowResizeEvent &event);

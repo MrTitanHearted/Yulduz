@@ -32,6 +32,8 @@ namespace Yulduz {
 
         glm::mat4 getProjection(float aspectRatio, float zNear, float zFar) const;
         glm::mat4 getView() const;
+        glm::mat4 getInverseProjection(float aspectRatio, float zNear, float zFar) const;
+        glm::mat4 getInverseView() const;
 
         glm::vec3 getPosition() const;
         glm::vec3 getFront() const;
