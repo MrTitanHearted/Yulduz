@@ -1,0 +1,65 @@
+#pragma once
+
+#include <Yulduz/Core.hpp>
+#include <YulduzAssets/IAsset.hpp>
+
+namespace Yulduz {
+    class AssetManager {
+       public:
+        AssetManager(const std::string &label);
+        ~AssetManager();
+
+        inline AssetManager() : AssetManager("Yulduz Asset Manager") {}
+        inline std::string getLable() const { return m_Label; }
+
+        template <typename Asset, typename = std::enable_if_t<std::is_base_of<IAsset, Asset>::value>>
+        bool hasAsset(const std::string &name) const {
+            const std::string &type = typeid(Asset).name();
+            return hasAsset(type, name);
+        }
+
+        template <typename Asset, typename = std::enable_if_t<std::is_base_of<IAsset, Asset>::value>>
+        bool addAsset(const std::string &name, const std::shared_ptr<Asset> &asset) {
+            const std::string &type = typeid(Asset).name();
+            return addAsset(type, name, asset);
+        }
+
+        template <typename Asset, typename = std::enable_if_t<std::is_base_of<IAsset, Asset>::value>>
+        bool setAsset(const std::string &name, const std::shared_ptr<Asset> &asset) {
+            const std::string &type = typeid(Asset).name();
+            return setAsset(type, name, asset);
+        }
+
+        template <typename Asset, typename = std::enable_if_t<std::is_base_of<IAsset, Asset>::value>>
+        bool removeAsset(const std::string &name) {
+            const std::string &type = typeid(Asset).name();
+            return removeAsset(type, name);
+        }
+
+        template <typename Asset, typename = std::enable_if_t<std::is_base_of<IAsset, Asset>::value>>
+        std::optional<std::shared_ptr<Asset>> getAsset(const std::string &name) const {
+            const std::string &type = typeid(Asset).name();
+            if (!hasAsset(type, name)) return std::nullopt;
+            return std::dynamic_pointer_cast<Asset>(getAsset(type, name));
+        }
+
+        static AssetManager &GetDefault();
+
+       private:
+        using IAssetHandle = std::shared_ptr<IAsset>;
+        using AssetMap = std::unordered_map<std::string, IAssetHandle>;
+
+       private:
+        std::string m_Label;
+        std::unordered_map<std::string, AssetMap> m_TypeToAssetMap;
+
+        static AssetManager g_AssetManager;
+
+       private:
+        bool hasAsset(const std::string &type, const std::string &name) const;
+        bool addAsset(const std::string &type, const std::string &name, const IAssetHandle &iasset);
+        bool setAsset(const std::string &type, const std::string &name, const IAssetHandle &iasset);
+        bool removeAsset(const std::string &type, const std::string &name);
+        IAssetHandle getAsset(const std::string &type, const std::string &name) const;
+    };
+}  // namespace Yulduz
