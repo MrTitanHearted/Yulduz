@@ -113,39 +113,40 @@ namespace Yulduz {
         return m_Attachment;
     }
 
-    RenderPass::RenderPass(const std::string &label, const WGPURenderPassEncoder &handle) {
+    RenderPass::RenderPass(const std::string &label, const WGPURenderPassEncoder &handle)
+        : m_Label{label}, m_RenderPassEncoder{handle} {
         assert(handle != nullptr && "RenderPass handle cannot be nullptr");
-
-        m_RenderPassEncoder = handle;
-        m_Label = label;
     }
+
+    RenderPass::RenderPass()
+        : m_Label{}, m_RenderPassEncoder{nullptr} {}
 
     RenderPass::~RenderPass() {
         if (m_RenderPassEncoder)
             wgpuRenderPassEncoderRelease(m_RenderPassEncoder);
     }
 
-    RenderPass::RenderPass(const RenderPass &other) {
-        assert(other.m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+    RenderPass::RenderPass(const RenderPass &other)
+        : m_Label{other.m_Label}, m_RenderPassEncoder{other.m_RenderPassEncoder} {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+        wgpuRenderPassEncoderReference(m_RenderPassEncoder);
+    }
 
-        if (&other != this) {
-            wgpuRenderPassEncoderRelease(m_RenderPassEncoder);
-
-            m_RenderPassEncoder = other.m_RenderPassEncoder;
-            m_Label = other.m_Label;
-
-            wgpuRenderPassEncoderReference(m_RenderPassEncoder);
-        }
+    RenderPass::RenderPass(RenderPass &&other)
+        : m_Label{other.m_Label}, m_RenderPassEncoder{other.m_RenderPassEncoder} {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+        other.m_RenderPassEncoder = nullptr;
+        other.m_Label = "";
     }
 
     RenderPass &RenderPass::operator=(const RenderPass &other) {
         assert(other.m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
 
         if (&other != this) {
-            wgpuRenderPassEncoderRelease(m_RenderPassEncoder);
+            if (m_RenderPassEncoder) wgpuRenderPassEncoderRelease(m_RenderPassEncoder);
 
-            m_RenderPassEncoder = other.m_RenderPassEncoder;
             m_Label = other.m_Label;
+            m_RenderPassEncoder = other.m_RenderPassEncoder;
 
             wgpuRenderPassEncoderReference(m_RenderPassEncoder);
         }
@@ -153,28 +154,14 @@ namespace Yulduz {
         return *this;
     }
 
-    RenderPass::RenderPass(RenderPass &&other) {
-        assert(other.m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
-
-        if (&other != this) {
-            wgpuRenderPassEncoderRelease(m_RenderPassEncoder);
-
-            m_RenderPassEncoder = other.m_RenderPassEncoder;
-            m_Label = other.m_Label;
-
-            other.m_RenderPassEncoder = nullptr;
-            other.m_Label = "";
-        }
-    }
-
     RenderPass &RenderPass::operator=(RenderPass &&other) {
         assert(other.m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
 
         if (&other != this) {
-            wgpuRenderPassEncoderRelease(m_RenderPassEncoder);
+            if (m_RenderPassEncoder) wgpuRenderPassEncoderRelease(m_RenderPassEncoder);
 
-            m_RenderPassEncoder = other.m_RenderPassEncoder;
             m_Label = other.m_Label;
+            m_RenderPassEncoder = other.m_RenderPassEncoder;
 
             other.m_RenderPassEncoder = nullptr;
             other.m_Label = "";
@@ -197,7 +184,7 @@ namespace Yulduz {
 
     std::string RenderPass::getLabel() const {
         assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
-        
+
         return m_Label;
     }
 

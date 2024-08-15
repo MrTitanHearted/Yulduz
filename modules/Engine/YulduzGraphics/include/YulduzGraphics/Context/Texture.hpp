@@ -10,13 +10,14 @@ namespace Yulduz {
     class Texture {
        public:
         Texture(const std::string &label, const WGPUTexture &handle, const GraphicsContext &context);
-        Texture() = default;
+
+        Texture();
         ~Texture();
 
         Texture(const Texture &other);
-        Texture &operator=(const Texture &other);
-
         Texture(Texture &&other);
+
+        Texture &operator=(const Texture &other);
         Texture &operator=(Texture &&other);
 
         void resize2D(std::uint32_t width, std::uint32_t height);
@@ -53,12 +54,14 @@ namespace Yulduz {
     class TextureView {
        public:
         TextureView(const std::string &label, const WGPUTextureView &handle, const Texture &texture);
+
+        TextureView();
         ~TextureView();
 
         TextureView(const TextureView &other);
-        TextureView &operator=(const TextureView &other);
-
         TextureView(TextureView &&other);
+
+        TextureView &operator=(const TextureView &other);
         TextureView &operator=(TextureView &&other);
 
         WGPUTextureView get() const;
@@ -122,4 +125,34 @@ namespace Yulduz {
         std::string m_Label;
         WGPUTextureViewDescriptor m_Descriptor;
     };
+
+    template <typename T>
+    void GraphicsContext::renderFrame(void (T::*callback)(const Texture &frame), T *self) const {
+        assert(m_Instance != nullptr && "Instance handle cannot be nullptr");
+
+        WGPUSurfaceTexture surfaceTexture;
+        wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
+
+        switch (surfaceTexture.status) {
+            case WGPUSurfaceGetCurrentTextureStatus_Success:
+                break;
+            case WGPUSurfaceGetCurrentTextureStatus_Timeout:
+                YZERROR("Failed to get Surface Texture: Timeout");
+            case WGPUSurfaceGetCurrentTextureStatus_Outdated:
+                YZERROR("Failed to get Surface Texture: Outdated");
+            case WGPUSurfaceGetCurrentTextureStatus_Lost:
+                YZERROR("Failed to get Surface Texture: Lost");
+            case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
+                YZERROR("Failed to get Surface Texture: Out of memory");
+            case WGPUSurfaceGetCurrentTextureStatus_DeviceLost:
+                YZERROR("Failed to get Surface Texture: Device lost");
+            case WGPUSurfaceGetCurrentTextureStatus_Force32:
+                YZERROR("Failed to get Surface Texture");
+                return;
+        }
+
+        Texture frame{"Yulduz Surface Texture", surfaceTexture.texture, *this};
+        (self->*callback)(frame);
+        wgpuSurfacePresent(m_Surface);
+    }
 }  // namespace Yulduz

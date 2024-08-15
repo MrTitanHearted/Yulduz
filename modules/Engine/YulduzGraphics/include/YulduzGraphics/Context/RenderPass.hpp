@@ -54,12 +54,14 @@ namespace Yulduz {
     class RenderPass {
        public:
         RenderPass(const std::string &label, const WGPURenderPassEncoder &handle);
+
+        RenderPass();
         ~RenderPass();
 
         RenderPass(const RenderPass &other);
-        RenderPass &operator=(const RenderPass &other);
-
         RenderPass(RenderPass &&other);
+
+        RenderPass &operator=(const RenderPass &other);
         RenderPass &operator=(RenderPass &&other);
 
         void finish();

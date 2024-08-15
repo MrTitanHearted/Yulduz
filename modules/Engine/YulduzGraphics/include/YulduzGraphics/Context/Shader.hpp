@@ -12,12 +12,14 @@ namespace Yulduz {
     class Shader {
        public:
         Shader(const std::string &label, const WGPUShaderModule &handle);
+
+        Shader();
         ~Shader();
 
         Shader(const Shader &other);
-        Shader &operator=(const Shader &other);
-
         Shader(Shader &&other);
+
+        Shader &operator=(const Shader &other);
         Shader &operator=(Shader &&other);
 
         WGPUShaderModule get() const;

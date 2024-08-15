@@ -7,30 +7,30 @@ namespace Yulduz {
     void printWGPURegistryReport(const std::string &prefix, WGPURegistryReport report);
     void printHubReport(const std::string &prefix, WGPUHubReport report);
 
-    GraphicsContext::GraphicsContext(const Settings &settings) {
+    GraphicsContext::GraphicsContext(const Settings &settings)
+        : m_Instance{settings.Instance},
+          m_Adapter{settings.Adapter},
+          m_Surface{settings.Surface},
+          m_Device{settings.Device},
+          m_Queue{wgpuDeviceGetQueue(settings.Device)},
+          m_Config{settings.Config},
+          m_Window{&settings.Window.get()} {
         assert(settings.Instance != nullptr && "Instance handle cannot be nullptr");
         assert(settings.Surface != nullptr && "Surface handle cannot be nullptr");
         assert(settings.Adapter != nullptr && "Adapter handle cannot be nullptr");
         assert(settings.Device != nullptr && "Device handle cannot be nullptr");
 
         WGPUSupportedLimits supportedLimits{};
-        wgpuDeviceGetLimits(settings.Device, &supportedLimits);
-        auto [width, height] = settings.Window.get().getSize();
+        wgpuDeviceGetLimits(m_Device, &supportedLimits);
+        auto [width, height] = m_Window->getSize();
 
         WGPUAdapterProperties adapterProperties{};
-        wgpuAdapterGetProperties(settings.Adapter, &adapterProperties);
+        wgpuAdapterGetProperties(m_Adapter, &adapterProperties);
 
         WGPUSurfaceCapabilities caps{};
-        wgpuSurfaceGetCapabilities(settings.Surface, settings.Adapter, &caps);
+        wgpuSurfaceGetCapabilities(m_Surface, m_Adapter, &caps);
 
-        m_Instance = settings.Instance;
-        m_Surface = settings.Surface;
-        m_Adapter = settings.Adapter;
-        m_Device = settings.Device;
-        m_Queue = wgpuDeviceGetQueue(settings.Device);
-        m_Config = settings.Config;
         m_Limits = supportedLimits.limits;
-        m_Window = &settings.Window.get();
         for (std::size_t i = 0; i < caps.formatCount; i++)
             m_Caps.Formats.insert(static_cast<TextureFormat>(caps.formats[i]));
         for (std::size_t i = 0; i < caps.presentModeCount; i++)
@@ -61,6 +61,19 @@ namespace Yulduz {
         wgpuSurfaceCapabilitiesFreeMembers(caps);
     }
 
+    GraphicsContext::GraphicsContext()
+        : m_Instance{nullptr},
+          m_Surface{nullptr},
+          m_Adapter{nullptr},
+          m_Device{nullptr},
+          m_Queue{nullptr},
+          m_Config{},
+          m_Limits{},
+          m_Window{nullptr},
+          m_Caps{},
+          m_AdapterProperties{} {
+    }
+
     GraphicsContext::~GraphicsContext() {
         if (m_Instance) {
             wgpuQueueRelease(m_Queue);
@@ -71,38 +84,46 @@ namespace Yulduz {
         }
     }
 
-    GraphicsContext::GraphicsContext() {
-        m_Instance = nullptr;
-        m_Surface = nullptr;
-        m_Adapter = nullptr;
-        m_Device = nullptr;
-        m_Queue = nullptr;
-        m_Config = {};
-        m_Limits = {};
-        m_Window = nullptr;
-        m_Caps = {};
-        m_AdapterProperties = {};
+    GraphicsContext::GraphicsContext(const GraphicsContext &other)
+        : m_Instance{other.m_Instance},
+          m_Adapter{other.m_Adapter},
+          m_Surface{other.m_Surface},
+          m_Device{other.m_Device},
+          m_Queue{other.m_Queue},
+          m_Config{other.m_Config},
+          m_Limits{other.m_Limits},
+          m_Window{other.m_Window},
+          m_Caps{other.m_Caps},
+          m_AdapterProperties{other.m_AdapterProperties} {
+        assert(m_Instance != nullptr && "Instance handle cannot be nullptr");
+        wgpuInstanceReference(m_Instance);
+        wgpuAdapterReference(m_Adapter);
+        wgpuSurfaceReference(m_Surface);
+        wgpuDeviceReference(m_Device);
+        wgpuQueueReference(m_Queue);
     }
 
-    GraphicsContext::GraphicsContext(const GraphicsContext &other) {
-        assert(other.m_Instance != nullptr && "Instance handle cannot be nullptr");
-
-        wgpuInstanceReference(other.m_Instance);
-        wgpuSurfaceReference(other.m_Surface);
-        wgpuAdapterReference(other.m_Adapter);
-        wgpuDeviceReference(other.m_Device);
-        wgpuQueueReference(other.m_Queue);
-
-        m_Instance = other.m_Instance;
-        m_Surface = other.m_Surface;
-        m_Adapter = other.m_Adapter;
-        m_Device = other.m_Device;
-        m_Queue = other.m_Queue;
-        m_Config = other.m_Config;
-        m_Limits = other.m_Limits;
-        m_Window = other.m_Window;
-        m_Caps = other.m_Caps;
-        m_AdapterProperties = other.m_AdapterProperties;
+    GraphicsContext::GraphicsContext(GraphicsContext &&other)
+        : m_Instance{other.m_Instance},
+          m_Adapter{other.m_Adapter},
+          m_Surface{other.m_Surface},
+          m_Device{other.m_Device},
+          m_Queue{other.m_Queue},
+          m_Config{other.m_Config},
+          m_Limits{other.m_Limits},
+          m_Window{other.m_Window},
+          m_Caps{other.m_Caps},
+          m_AdapterProperties{other.m_AdapterProperties} {
+        assert(m_Instance != nullptr && "Instance handle cannot be nullptr");
+        other.m_Instance = nullptr;
+        other.m_Adapter = nullptr;
+        other.m_Surface = nullptr;
+        other.m_Device = nullptr;
+        other.m_Queue = nullptr;
+        other.m_Limits = {};
+        other.m_Window = nullptr;
+        other.m_Caps = {};
+        other.m_AdapterProperties = {};
     }
 
     GraphicsContext &GraphicsContext::operator=(const GraphicsContext &other) {
@@ -111,15 +132,15 @@ namespace Yulduz {
         if (&other != this) {
             if (m_Instance) {
                 wgpuInstanceRelease(m_Instance);
-                wgpuSurfaceRelease(m_Surface);
                 wgpuAdapterRelease(m_Adapter);
+                wgpuSurfaceRelease(m_Surface);
                 wgpuDeviceRelease(m_Device);
                 wgpuQueueRelease(m_Queue);
             }
 
             m_Instance = other.m_Instance;
-            m_Surface = other.m_Surface;
             m_Adapter = other.m_Adapter;
+            m_Surface = other.m_Surface;
             m_Device = other.m_Device;
             m_Queue = other.m_Queue;
             m_Config = other.m_Config;
@@ -129,39 +150,13 @@ namespace Yulduz {
             m_AdapterProperties = other.m_AdapterProperties;
 
             wgpuInstanceReference(m_Instance);
-            wgpuSurfaceReference(m_Surface);
             wgpuAdapterReference(m_Adapter);
+            wgpuSurfaceReference(m_Surface);
             wgpuDeviceReference(m_Device);
             wgpuQueueReference(m_Queue);
         }
 
         return *this;
-    }
-
-    GraphicsContext::GraphicsContext(GraphicsContext &&other) {
-        assert(other.m_Instance != nullptr && "Instance handle cannot be nullptr");
-
-        m_Instance = other.m_Instance;
-        m_Surface = other.m_Surface;
-        m_Adapter = other.m_Adapter;
-        m_Device = other.m_Device;
-        m_Queue = other.m_Queue;
-        m_Config = other.m_Config;
-        m_Limits = other.m_Limits;
-        m_Window = other.m_Window;
-        m_Caps = other.m_Caps;
-        m_AdapterProperties = other.m_AdapterProperties;
-
-        other.m_Instance = nullptr;
-        other.m_Surface = nullptr;
-        other.m_Adapter = nullptr;
-        other.m_Device = nullptr;
-        other.m_Queue = nullptr;
-        other.m_Config = {};
-        other.m_Limits = {};
-        other.m_Window = nullptr;
-        other.m_Caps = {};
-        other.m_AdapterProperties = {};
     }
 
     GraphicsContext &GraphicsContext::operator=(GraphicsContext &&other) {
@@ -170,15 +165,15 @@ namespace Yulduz {
         if (&other != this) {
             if (m_Instance) {
                 wgpuInstanceRelease(m_Instance);
-                wgpuSurfaceRelease(m_Surface);
                 wgpuAdapterRelease(m_Adapter);
+                wgpuSurfaceRelease(m_Surface);
                 wgpuDeviceRelease(m_Device);
                 wgpuQueueRelease(m_Queue);
             }
 
             m_Instance = other.m_Instance;
-            m_Surface = other.m_Surface;
             m_Adapter = other.m_Adapter;
+            m_Surface = other.m_Surface;
             m_Device = other.m_Device;
             m_Queue = other.m_Queue;
             m_Config = other.m_Config;
@@ -188,11 +183,10 @@ namespace Yulduz {
             m_AdapterProperties = other.m_AdapterProperties;
 
             other.m_Instance = nullptr;
-            other.m_Surface = nullptr;
             other.m_Adapter = nullptr;
+            other.m_Surface = nullptr;
             other.m_Device = nullptr;
             other.m_Queue = nullptr;
-            other.m_Config = {};
             other.m_Limits = {};
             other.m_Window = nullptr;
             other.m_Caps = {};

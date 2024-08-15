@@ -42,10 +42,6 @@ namespace Yulduz {
         Info = 4,
     };
 
-    bool IsLogLevelVerbose(LogLevel level);
-    void SetLogLevelVerbose(LogLevel level, bool verbose);
-    void SetAllLogLevelVerbose(bool verbose);
-
     void printLog(LogLevel level, const std::string &function, const std::source_location &location, const std::string &log);
 
     std::string makeLogString(LogLevel level, const std::string &function, const std::source_location &location, const std::string &log);
@@ -62,9 +58,13 @@ namespace Yulduz {
         static void SetLogLevel(LogLevel level);
         static void SetTraceEnable(bool trace);
         static void SetTraceFile(const std::string &file);
+        static void SetVerbose(LogLevel level, bool verbose);
+        static void SetAllVerbose(bool verbose);
+
+        static bool IsVerbose(LogLevel level);
 
         template <typename... Args>
-        static void     Log(LogLevel level, const std::string &function, const std::source_location &location, const std::string &fmt, Args &&...args) {
+        static void Log(LogLevel level, const std::string &function, const std::source_location &location, const std::string &fmt, Args &&...args) {
             if (g_Logger.m_Level < level) return;
 
             std::string message = std::vformat(fmt, std::make_format_args(args...));
@@ -91,6 +91,10 @@ namespace Yulduz {
         static void SetLogLevel(LogLevel level) {}
         static void SetTraceEnable(bool trace) {}
         static void SetTraceFile(const std::string &file) {}
+        static void SetVerbose(LogLevel level, bool verbose) {}
+        static void SetAllVerbose(bool verbose) {}
+
+        static bool IsVerbose(LogLevel level) { return false;  }
 
         template <typename... Args>
         static void Log(LogLevel level, const std::string &function, size_t line, const std::string &fmt, Args &&...args) {}

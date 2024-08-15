@@ -47,38 +47,23 @@ namespace Yulduz {
             }
 
             std::vector<Event> &eventVector = static_cast<EventVector<Event> &>(*(m_EventDataMap[eventHashCode].get())).m_Events;
-            m_EventIndicesMap[eventHashCode].emplace_back(eventVector.size());
+            m_EventIndicesMap[eventHashCode].emplace_back(static_cast<std::uint32_t>(eventVector.size()));
             eventVector.emplace_back(event);
         }
 
         void dispatch() {
             if (m_CallbacksMap.empty() || m_EventIndicesMap.empty()) return;
 
+            for (const auto &[eventHashCode, eventIndices] : m_EventIndicesMap) {
+                const auto &callbacks = m_CallbacksMap[eventHashCode];
+                const auto &ieventVector = m_EventDataMap[eventHashCode];
 
-            if (m_CallbacksMap.size() < m_EventIndicesMap.size())
-                for (const auto &[eventHashCode, callbacks] : m_CallbacksMap) {
-                    const auto &eventIndices = m_EventIndicesMap[eventHashCode];
-                    const auto &ieventVector = m_EventDataMap[eventHashCode];
-                    if (eventIndices.empty()) continue;
-
-                    for (const auto &callback : callbacks) {
-                        for (const std::uint32_t &eventIndex : eventIndices) {
-                            callback(ieventVector->get(eventIndex));
-                        }
+                for (const auto &callback : callbacks) {
+                    for (const std::uint32_t &eventIndex : eventIndices) {
+                        callback(ieventVector->get(eventIndex));
                     }
                 }
-            else
-                for (const auto &[eventHashCode, eventIndices] : m_EventIndicesMap) {
-                    const auto &callbacks = m_CallbacksMap[eventHashCode];
-                    const auto &ieventVector = m_EventDataMap[eventHashCode];
-                    if (callbacks.empty()) continue;
-
-                    for (const auto &callback : callbacks) {
-                        for (const std::uint32_t &eventIndex : eventIndices) {
-                            callback(ieventVector->get(eventIndex));
-                        }
-                    }
-                }
+            }
 
             m_EventIndicesMap.clear();
             m_EventDataMap.clear();

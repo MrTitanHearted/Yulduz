@@ -27,26 +27,6 @@ namespace Yulduz {
 #if defined(YULDUZ_BUILD_TYPE_DEBUG)
     Logger Logger::g_Logger{};
     bool g_LogLevelVerbosity[5]{true, true, true, false, false};
-
-    bool IsLogLevelVerbose(LogLevel level) {
-        return g_LogLevelVerbosity[level];
-    }
-
-    void SetLogLevelVerbose(LogLevel level, bool verbose) {
-        g_LogLevelVerbosity[level] = verbose;
-    }
-
-    void SetAllLogLevelVerbose(bool verbose) {
-        g_LogLevelVerbosity[LogLevel::Fatal] = verbose;
-        g_LogLevelVerbosity[LogLevel::Error] = verbose;
-        g_LogLevelVerbosity[LogLevel::Warn] = verbose;
-        g_LogLevelVerbosity[LogLevel::Debug] = verbose;
-        g_LogLevelVerbosity[LogLevel::Info] = verbose;
-    }
-#else
-    bool IsLogLevelVerbose(LogLevel level) { return false; }
-    void SetLogLevelVerbose(LogLevel level, bool verbose) {}
-    void SetAllLogLevelVerbose(bool verbose) {}
 #endif
 
     const char *LogLevelStrs[]{
@@ -114,7 +94,7 @@ namespace Yulduz {
     std::string makeLogString(LogLevel level, const std::string &function, const std::source_location &location, const std::string &message) {
         std::string currentTimeString = Timer::GetCurrentTimeStr();
 
-        if (IsLogLevelVerbose(level)) {
+        if (Logger::IsVerbose(level)) {
             const std::uint32_t line = location.line();
             const std::uint32_t column = location.column();
             std::string file = location.file_name();
@@ -147,6 +127,22 @@ namespace Yulduz {
         g_Logger.m_TracePath = file;
     }
 
+    bool Logger::IsVerbose(LogLevel level) {
+        return g_LogLevelVerbosity[level];
+    }
+
+    void Logger::SetVerbose(LogLevel level, bool verbose) {
+        g_LogLevelVerbosity[level] = verbose;
+    }
+
+    void Logger::SetAllVerbose(bool verbose) {
+        g_LogLevelVerbosity[LogLevel::Fatal] = verbose;
+        g_LogLevelVerbosity[LogLevel::Error] = verbose;
+        g_LogLevelVerbosity[LogLevel::Warn] = verbose;
+        g_LogLevelVerbosity[LogLevel::Debug] = verbose;
+        g_LogLevelVerbosity[LogLevel::Info] = verbose;
+    }
+
     Logger::Logger() {
         LOG_INFO("Initializing Yulduz Logger");
 
@@ -157,7 +153,7 @@ namespace Yulduz {
 
     Logger::~Logger() {
         LOG_INFO("Releasing Yulduz Logger");
-        
+
         if (m_Trace && !m_TracePath.empty()) {
             std::ofstream file(m_TracePath);
             file << m_TraceContent.str();

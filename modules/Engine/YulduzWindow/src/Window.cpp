@@ -444,6 +444,8 @@ namespace Yulduz {
                 return "Release";
             case KeyAction::Repeat:
                 return "Repeat";
+            default:
+                return "Unknown";
         }
     }
 

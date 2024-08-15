@@ -3,13 +3,7 @@
 int main(int argc, char **argv) {
     Yulduz::Logger::SetLogLevel(Yulduz::LogLevel::Debug);
 
-    try {
-        Yulduz::App::Run();
-    } catch (const std::exception &e) {
-        YZFATAL("Caught Error: '{}'", e.what());
-    } catch (...) {
-        YZFATAL("Caught Unknown Errors!");
-    }
+    Yulduz::App::Run();
 
     // #if defined(YULDUZ_BUILD_TYPE_DEBUG)
     //     LOG_INFO("Press Enter to exit...");

@@ -74,8 +74,6 @@ namespace Yulduz {
     }
 
     void Window::GlfwWindowSizeCallback(GLFWwindow *window, std::int32_t width, std::int32_t height) {
-        LOG_INFO("GLFW Window resized to {}x{}", width, height);
-
         Window *yz = static_cast<Window *>(glfwGetWindowUserPointer(window));
         g_EventDispatcher->addEvent<WindowResizeEvent>(WindowResizeEvent{yz, static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)});
     }

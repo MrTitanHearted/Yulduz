@@ -5,13 +5,11 @@
 
 namespace Yulduz {
     class Texture;
-
-    typedef void (*RenderFrameOnSurfaceCallback)(const Texture &frame);
-
     class CommandBuffer;
-    class CommandEncoder;
     class TextureView;
     class Window;
+
+    typedef void (*RenderFrameOnSurfaceCallback)(const Texture &frame);
 
     struct AdapterProperties {
         std::uint32_t VendorID;
@@ -48,9 +46,9 @@ namespace Yulduz {
         ~GraphicsContext();
 
         GraphicsContext(const GraphicsContext &other);
-        GraphicsContext &operator=(const GraphicsContext &other);
-
         GraphicsContext(GraphicsContext &&other);
+
+        GraphicsContext &operator=(const GraphicsContext &other);
         GraphicsContext &operator=(GraphicsContext &&other);
 
         void resize(std::uint32_t width, std::uint32_t height);
@@ -74,37 +72,10 @@ namespace Yulduz {
         TextureFormat getSurfaceFormat() const;
         const Window &getWindow() const;
 
-        static void SetupWGPULogging(WGPULogLevel level);
-
         template <typename T>
-        void renderFrame(void (T::*callback)(const Texture &frame), T *self) const {
-            assert(m_Instance != nullptr && "Instance handle cannot be nullptr");
+        void renderFrame(void (T::*callback)(const Texture &frame), T *self) const;
 
-            WGPUSurfaceTexture surfaceTexture;
-            wgpuSurfaceGetCurrentTexture(m_Surface, &surfaceTexture);
-
-            switch (surfaceTexture.status) {
-                case WGPUSurfaceGetCurrentTextureStatus_Success:
-                    break;
-                case WGPUSurfaceGetCurrentTextureStatus_Timeout:
-                    YZERROR("Failed to get Surface Texture: Timeout");
-                case WGPUSurfaceGetCurrentTextureStatus_Outdated:
-                    YZERROR("Failed to get Surface Texture: Outdated");
-                case WGPUSurfaceGetCurrentTextureStatus_Lost:
-                    YZERROR("Failed to get Surface Texture: Lost");
-                case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
-                    YZERROR("Failed to get Surface Texture: Out of memory");
-                case WGPUSurfaceGetCurrentTextureStatus_DeviceLost:
-                    YZERROR("Failed to get Surface Texture: Device lost");
-                case WGPUSurfaceGetCurrentTextureStatus_Force32:
-                    YZERROR("Failed to get Surface Texture");
-                    return;
-            }
-
-            Texture frame{"Yulduz Surface Texture", surfaceTexture.texture, *this};
-            (self->*callback)(frame);
-            wgpuSurfacePresent(m_Surface);
-        }
+        static void SetupWGPULogging(WGPULogLevel level);
 
        private:
         WGPUInstance m_Instance;

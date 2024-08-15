@@ -3,13 +3,13 @@
 #include <YulduzGraphics/Context/Texture.hpp>
 
 namespace Yulduz {
-    Texture::Texture(const std::string &label, const WGPUTexture &handle, const GraphicsContext &context) : m_ContextReference{context} {
+    Texture::Texture(const std::string &label, const WGPUTexture &handle, const GraphicsContext &context)
+        : m_Label{label}, m_Texture{handle}, m_DefaultView{wgpuTextureCreateView(handle, nullptr)}, m_ContextReference{context} {
         assert(handle != nullptr && "Texture handle cannot be nullptr");
-
-        m_Texture = handle;
-        m_DefaultView = wgpuTextureCreateView(m_Texture, nullptr);
-        m_Label = label;
     }
+
+    Texture::Texture()
+        : m_Label{}, m_Texture{nullptr}, m_DefaultView{nullptr}, m_ContextReference{} {}
 
     Texture::~Texture() {
         if (m_Texture) {
@@ -18,65 +18,58 @@ namespace Yulduz {
         }
     }
 
-    Texture::Texture(const Texture &other) : m_ContextReference{other.m_ContextReference} {
-        assert(other.m_Texture != nullptr && "Texture handle cannot be nullptr");
+    Texture::Texture(const Texture &other)
+        : m_Label{other.m_Label}, m_Texture{other.m_Texture}, m_DefaultView{other.m_DefaultView}, m_ContextReference{other.m_ContextReference} {
+        assert(m_Texture != nullptr && "Texture handle cannot be nullptr");
+        wgpuTextureReference(m_Texture);
+        wgpuTextureViewReference(m_DefaultView);
+    }
 
-        wgpuTextureViewReference(other.m_DefaultView);
-        wgpuTextureReference(other.m_Texture);
-
-        m_DefaultView = other.m_DefaultView;
-        m_Texture = other.m_Texture;
-        m_Label = other.m_Label;
+    Texture::Texture(Texture &&other)
+        : m_Label{other.m_Label}, m_Texture{other.m_Texture}, m_DefaultView{other.m_DefaultView}, m_ContextReference{std::move(other.m_ContextReference)} {
+        assert(m_Texture != nullptr && "Texture handle cannot be nullptr");
+        other.m_Texture = nullptr;
+        other.m_DefaultView = nullptr;
     }
 
     Texture &Texture::operator=(const Texture &other) {
         assert(other.m_Texture != nullptr && "Texture handle cannot be nullptr");
 
         if (&other != this) {
-            wgpuTextureViewRelease(m_DefaultView);
-            wgpuTextureRelease(m_Texture);
+            if (m_Texture) {
+                wgpuTextureViewRelease(m_DefaultView);
+                wgpuTextureRelease(m_Texture);
+            }
 
-            m_ContextReference = other.m_ContextReference;
-            m_DefaultView = other.m_DefaultView;
-            m_Texture = other.m_Texture;
             m_Label = other.m_Label;
+            m_Texture = other.m_Texture;
+            m_DefaultView = other.m_DefaultView;
+            m_ContextReference = other.m_ContextReference;
 
-            wgpuTextureViewReference(m_DefaultView);
             wgpuTextureReference(m_Texture);
+            wgpuTextureViewReference(m_DefaultView);
         }
 
         return *this;
-    }
-
-    Texture::Texture(Texture &&other) : m_ContextReference{other.m_ContextReference} {
-        assert(other.m_Texture != nullptr && "Texture handle cannot be nullptr");
-
-        m_DefaultView = other.m_DefaultView;
-        m_Texture = other.m_Texture;
-        m_Label = other.m_Label;
-
-        other.m_DefaultView = nullptr;
-        other.m_Texture = nullptr;
-        other.m_Label = "";
-        other.m_ContextReference = {};
     }
 
     Texture &Texture::operator=(Texture &&other) {
         assert(other.m_Texture != nullptr && "Texture handle cannot be nullptr");
 
         if (&other != this) {
-            wgpuTextureViewRelease(m_DefaultView);
-            wgpuTextureRelease(m_Texture);
+            if (m_Texture) {
+                wgpuTextureViewRelease(m_DefaultView);
+                wgpuTextureRelease(m_Texture);
+            }
 
-            m_ContextReference = other.m_ContextReference;
-            m_DefaultView = other.m_DefaultView;
-            m_Texture = other.m_Texture;
             m_Label = other.m_Label;
+            m_Texture = other.m_Texture;
+            m_DefaultView = other.m_DefaultView;
+            m_ContextReference = std::move(other.m_ContextReference);
 
-            other.m_DefaultView = nullptr;
             other.m_Texture = nullptr;
+            other.m_DefaultView = nullptr;
             other.m_Label = "";
-            other.m_ContextReference = {};
         }
 
         return *this;
@@ -202,6 +195,12 @@ namespace Yulduz {
         return m_ContextReference;
     }
 
+    std::string Texture::getLabel() const {
+        assert(m_Texture != nullptr && "Texture handle cannot be nullptr");
+
+        return m_Label;
+    }
+
     TextureFormat Texture::getFormat() const {
         assert(m_Texture != nullptr && "Texture handle cannot be nullptr");
 
@@ -268,12 +267,13 @@ namespace Yulduz {
         return GetTextureFormatSize(static_cast<TextureFormat>(wgpuTextureGetFormat(m_Texture)));
     }
 
-    TextureView::TextureView(const std::string &label,const WGPUTextureView &handle, const Texture &texture) : m_TextureReference{texture} {
-        assert(handle != nullptr && "Texture View handle cannot be nullptr");
-
-        m_View = handle;
-        m_Label = label;
+    TextureView::TextureView(const std::string &label, const WGPUTextureView &handle, const Texture &texture)
+        : m_Label{label}, m_View{handle}, m_TextureReference{texture} {
+        assert(handle != nullptr && "TextureView handle cannot be nullptr");
     }
+
+    TextureView::TextureView()
+        : m_Label{}, m_View{nullptr}, m_TextureReference{} {}
 
     TextureView::~TextureView() {
         if (m_View) {
@@ -281,24 +281,28 @@ namespace Yulduz {
         }
     }
 
-    TextureView::TextureView(const TextureView &other) : m_TextureReference{other.m_TextureReference} {
-        assert(other.m_View != nullptr && "Texture View handle cannot be nullptr");
+    TextureView::TextureView(const TextureView &other)
+        : m_Label{other.m_Label}, m_View{other.m_View}, m_TextureReference{other.m_TextureReference} {
+        assert(m_View != nullptr && "TextureView handle cannot be nullptr");
+        wgpuTextureViewReference(m_View);
+    }
 
-        wgpuTextureViewReference(other.m_View);
-
-        m_View = other.m_View;
-        m_Label = other.m_Label;
+    TextureView::TextureView(TextureView &&other)
+        : m_Label{other.m_Label}, m_View{other.m_View}, m_TextureReference{std::move(other.m_TextureReference)} {
+        assert(m_View != nullptr && "TextureView handle cannot be nullptr");
+        other.m_View = nullptr;
+        other.m_Label = "";
     }
 
     TextureView &TextureView::operator=(const TextureView &other) {
-        assert(other.m_View != nullptr && "Texture View handle cannot be nullptr");
+        assert(other.m_View != nullptr && "TextureView handle cannot be nullptr");
 
         if (&other != this) {
-            wgpuTextureViewRelease(m_View);
+            if (m_View) wgpuTextureViewRelease(m_View);
 
-            m_TextureReference = other.m_TextureReference;
             m_View = other.m_View;
             m_Label = other.m_Label;
+            m_TextureReference = other.m_TextureReference;
 
             wgpuTextureViewReference(m_View);
         }
@@ -306,46 +310,37 @@ namespace Yulduz {
         return *this;
     }
 
-    TextureView::TextureView(TextureView &&other) : m_TextureReference{other.m_TextureReference} {
-        assert(other.m_View != nullptr && "Texture View handle cannot be nullptr");
-
-        m_View = other.m_View;
-        m_Label = other.m_Label;
-
-        other.m_View = nullptr;
-        other.m_Label = "";
-        other.m_TextureReference = {};
-    }
-
     TextureView &TextureView::operator=(TextureView &&other) {
-        assert(other.m_View != nullptr && "Texture View handle cannot be nullptr");
+        assert(other.m_View != nullptr && "TextureView handle cannot be nullptr");
 
         if (&other != this) {
-            wgpuTextureViewRelease(m_View);
+            if (m_View) wgpuTextureViewRelease(m_View);
 
-            m_TextureReference = other.m_TextureReference;
             m_View = other.m_View;
+            m_Label = other.m_Label;
+            m_TextureReference = std::move(other.m_TextureReference);
 
             other.m_View = nullptr;
+            other.m_Label = "";
         }
 
         return *this;
     }
 
     WGPUTextureView TextureView::get() const {
-        assert(m_View != nullptr && "Texture View handle cannot be nullptr");
+        assert(m_View != nullptr && "TextureView handle cannot be nullptr");
 
         return m_View;
     }
 
     const Texture &TextureView::getTextureRef() const {
-        assert(m_View != nullptr && "Texture View handle cannot be nullptr");
+        assert(m_View != nullptr && "TextureView handle cannot be nullptr");
 
         return m_TextureReference;
     }
 
     Texture &TextureView::getTextureMut() {
-        assert(m_View != nullptr && "Texture View handle cannot be nullptr");
+        assert(m_View != nullptr && "TextureView handle cannot be nullptr");
 
         return m_TextureReference;
     }
@@ -433,6 +428,7 @@ namespace Yulduz {
 
     Texture TextureBuilder::empty(std::uint32_t width, std::uint32_t height, std::uint32_t depthOrArrayLayers, const GraphicsContext &context) {
         m_Descriptor.label = m_Label.c_str();
+        m_Descriptor.usage |= WGPUTextureUsage_TextureBinding;
         m_Descriptor.viewFormatCount = m_ViewFormats.size();
         m_Descriptor.viewFormats = (WGPUTextureFormat *)m_ViewFormats.data();
         m_Descriptor.size = WGPUExtent3D{.width = width, .height = height, .depthOrArrayLayers = depthOrArrayLayers};

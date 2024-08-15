@@ -2,36 +2,36 @@
 #include <YulduzGraphics/Context/GraphicsContext.hpp>
 
 namespace Yulduz {
-    Sampler::Sampler(const std::string &label, const WGPUSampler &sampler) {
+    Sampler::Sampler(const std::string &label, const WGPUSampler &sampler)
+        : m_Label{label}, m_Sampler{sampler} {
         assert(sampler != nullptr && "Sampler handler cannot be nullptr");
-
-        m_Sampler = sampler;
-        m_Label = label;
     }
+
+    Sampler::Sampler()
+        : m_Label{"Yulduz Sampler"}, m_Sampler{nullptr} {}
 
     Sampler::~Sampler() {
         if (m_Sampler)
             wgpuSamplerRelease(m_Sampler);
     }
 
-    Sampler::Sampler(const Sampler &other) {
-        assert(other.m_Sampler != nullptr && "Sampler handler cannot be nullptr");
+    Sampler::Sampler(const Sampler &other)
+        : m_Label{other.m_Label}, m_Sampler{other.m_Sampler} {
+        assert(m_Sampler != nullptr && "Sampler handler cannot be nullptr");
+        wgpuSamplerReference(m_Sampler);
+    }
 
-        if (&other != this) {
-            wgpuSamplerRelease(m_Sampler);
-
-            m_Sampler = other.m_Sampler;
-            m_Label = other.m_Label;
-
-            wgpuSamplerReference(m_Sampler);
-        }
+    Sampler::Sampler(Sampler &&other)
+        : m_Label{other.m_Label}, m_Sampler{other.m_Sampler} {
+        assert(m_Sampler != nullptr && "Sampler handler cannot be nullptr");
+        other.m_Sampler = nullptr;
     }
 
     Sampler &Sampler::operator=(const Sampler &other) {
         assert(other.m_Sampler != nullptr && "Sampler handler cannot be nullptr");
 
         if (&other != this) {
-            wgpuSamplerRelease(m_Sampler);
+            if (m_Sampler) wgpuSamplerRelease(m_Sampler);
 
             m_Sampler = other.m_Sampler;
             m_Label = other.m_Label;
@@ -42,25 +42,11 @@ namespace Yulduz {
         return *this;
     }
 
-    Sampler::Sampler(Sampler &&other) {
-        assert(other.m_Sampler != nullptr && "Sampler handler cannot be nullptr");
-
-        if (&other != this) {
-            wgpuSamplerRelease(m_Sampler);
-
-            m_Sampler = other.m_Sampler;
-            m_Label = other.m_Label;
-
-            other.m_Sampler = nullptr;
-            other.m_Label = "";
-        }
-    }
-
     Sampler &Sampler::operator=(Sampler &&other) {
         assert(other.m_Sampler != nullptr && "Sampler handler cannot be nullptr");
 
         if (&other != this) {
-            wgpuSamplerRelease(m_Sampler);
+            if (m_Sampler) wgpuSamplerRelease(m_Sampler);
 
             m_Sampler = other.m_Sampler;
             m_Label = other.m_Label;

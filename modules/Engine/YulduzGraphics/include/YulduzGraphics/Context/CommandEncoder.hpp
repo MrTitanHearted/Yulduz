@@ -1,19 +1,45 @@
 #pragma once
 
 #include <Yulduz/Core.hpp>
+#include <YulduzGraphics/Enums.hpp>
+#include <YulduzGraphics/Context/Texture.hpp>
 
 namespace Yulduz {
     class GraphicsContext;
+    class Buffer;
+
+    class ImageCopyTexture {
+       public:
+        ImageCopyTexture(const Texture &texture);
+        ~ImageCopyTexture() = default;
+
+        inline static ImageCopyTexture New(const Texture &texture) { return ImageCopyTexture{texture}; }
+
+        void write(const void *data) const;
+
+        ImageCopyTexture &setMipLevel(std::uint32_t mipLevel);
+        ImageCopyTexture &setOrigin3D(std::uint32_t x, std::uint32_t y, std::uint32_t z);
+        ImageCopyTexture &setAspect(TextureAspect aspect);
+
+        const WGPUImageCopyTexture &getRef() const;
+        const Texture &getTextureRef() const;
+
+       private:
+        Texture m_Texture;
+        WGPUImageCopyTexture m_ImageCopyTexture;
+    };
 
     class CommandBuffer {
        public:
         CommandBuffer(const WGPUCommandBuffer &handle);
+
+        CommandBuffer();
         ~CommandBuffer();
 
         CommandBuffer(const CommandBuffer &other);
-        CommandBuffer &operator=(const CommandBuffer &other);
-
         CommandBuffer(CommandBuffer &&other);
+
+        CommandBuffer &operator=(const CommandBuffer &other);
         CommandBuffer &operator=(CommandBuffer &&other);
 
         WGPUCommandBuffer get() const;
@@ -25,13 +51,20 @@ namespace Yulduz {
     class CommandEncoder {
        public:
         CommandEncoder(const std::string &label, const WGPUCommandEncoder &handle);
+
+        CommandEncoder();
         ~CommandEncoder();
 
         CommandEncoder(const CommandEncoder &other);
-        CommandEncoder &operator=(const CommandEncoder &other);
-
         CommandEncoder(CommandEncoder &&other);
+
+        CommandEncoder &operator=(const CommandEncoder &other);
         CommandEncoder &operator=(CommandEncoder &&other);
+
+        void copyTextureToTexture(const ImageCopyTexture &src, const ImageCopyTexture &dst);
+        void copyBufferToBuffer(const Buffer &src, const Buffer &dst);
+        void copyTextureToBuffer(const ImageCopyTexture &src, const Buffer &dst);
+        void copyBufferToTexture(const Buffer &src, const ImageCopyTexture &dst);
 
         WGPUCommandEncoder get() const;
         std::string getLabel() const;

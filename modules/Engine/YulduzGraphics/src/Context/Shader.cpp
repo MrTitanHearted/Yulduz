@@ -1,38 +1,38 @@
 #include <YulduzGraphics/Context/Shader.hpp>
 #include <YulduzGraphics/Context/GraphicsContext.hpp>
 
-
 namespace Yulduz {
-    Shader::Shader(const std::string &label, const WGPUShaderModule &handle) {
+    Shader::Shader(const std::string &label, const WGPUShaderModule &handle)
+        : m_Label{label}, m_ShaderModule{handle} {
         assert(handle != nullptr && "Shader Module handle cannot be nullptr");
-
-        m_ShaderModule = handle;
-        m_Label = label;
     }
+
+    Shader::Shader()
+        : m_Label{}, m_ShaderModule{nullptr} {}
 
     Shader::~Shader() {
         if (m_ShaderModule)
             wgpuShaderModuleRelease(m_ShaderModule);
     }
 
-    Shader::Shader(const Shader &other) {
+    Shader::Shader(const Shader &other)
+        : m_Label{other.m_Label}, m_ShaderModule{other.m_ShaderModule} {
         assert(other.m_ShaderModule != nullptr && "Shader Module handle cannot be nullptr");
+        wgpuShaderModuleReference(m_ShaderModule);
+    }
 
-        if (&other != this) {
-            wgpuShaderModuleRelease(m_ShaderModule);
-
-            m_ShaderModule = other.m_ShaderModule;
-            m_Label = other.m_Label;
-
-            wgpuShaderModuleReference(m_ShaderModule);
-        }
+    Shader::Shader(Shader &&other)
+        : m_Label{other.m_Label}, m_ShaderModule{other.m_ShaderModule} {
+        assert(other.m_ShaderModule != nullptr && "Shader Module handle cannot be nullptr");
+        other.m_ShaderModule = nullptr;
+        other.m_Label = "";
     }
 
     Shader &Shader::operator=(const Shader &other) {
         assert(other.m_ShaderModule != nullptr && "Shader Module handle cannot be nullptr");
 
         if (&other != this) {
-            wgpuShaderModuleRelease(m_ShaderModule);
+            if (m_ShaderModule) wgpuShaderModuleRelease(m_ShaderModule);
 
             m_ShaderModule = other.m_ShaderModule;
             m_Label = other.m_Label;
@@ -42,25 +42,12 @@ namespace Yulduz {
 
         return *this;
     }
-    Shader::Shader(Shader &&other) {
-        assert(other.m_ShaderModule != nullptr && "Shader Module handle cannot be nullptr");
-
-        if (&other != this) {
-            wgpuShaderModuleRelease(m_ShaderModule);
-
-            m_ShaderModule = other.m_ShaderModule;
-            m_Label = other.m_Label;
-
-            other.m_ShaderModule = nullptr;
-            other.m_Label = "";
-        }
-    }
 
     Shader &Shader::operator=(Shader &&other) {
         assert(other.m_ShaderModule != nullptr && "Shader Module handle cannot be nullptr");
 
         if (&other != this) {
-            wgpuShaderModuleRelease(m_ShaderModule);
+            if (m_ShaderModule) wgpuShaderModuleRelease(m_ShaderModule);
 
             m_ShaderModule = other.m_ShaderModule;
             m_Label = other.m_Label;
@@ -80,7 +67,7 @@ namespace Yulduz {
 
     std::string Shader::getLabel() const {
         assert(m_ShaderModule != nullptr && "Shader Module handle cannot be nullptr");
-        
+
         return m_Label;
     }
 

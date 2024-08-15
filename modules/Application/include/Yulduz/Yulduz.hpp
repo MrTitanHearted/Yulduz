@@ -16,7 +16,18 @@ namespace Yulduz {
         double m_DeltaTime;
         double m_Time;
 
-        ImFont *m_Font;
+        BindGroupLayout m_FrameBindGroupLayout;
+        ComputePipeline m_FramePipeline;
+        // Can't use RGBA32Float type to texture binding, so two textures, one with rgba32float and another one with rgba8unorm
+        Texture m_Frame;
+        UniformBuffer m_FrameUniform;
+        BindGroup m_FrameBindGroup;
+
+       private:
+        struct FrameData {
+            float DeltaTime;
+            float Time;
+        };
 
        private:
         App();
@@ -24,7 +35,6 @@ namespace Yulduz {
 
         void run();
         void renderFrame(const Texture &frame);
-        void renderImGui();
 
         void keyCallback(const WindowKeyEvent &event);
         void resizeCallback(const WindowResizeEvent &event);

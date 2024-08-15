@@ -9,12 +9,14 @@ namespace Yulduz {
     class Sampler {
        public:
         Sampler(const std::string &label, const WGPUSampler &sampler);
+
+        Sampler();
         ~Sampler();
 
         Sampler(const Sampler &other);
-        Sampler &operator=(const Sampler &other);
-
         Sampler(Sampler &&other);
+
+        Sampler &operator=(const Sampler &other);
         Sampler &operator=(Sampler &&other);
 
         WGPUSampler get() const;
