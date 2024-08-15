@@ -5,10 +5,10 @@ int main(int argc, char **argv) {
 
     Yulduz::App::Run();
 
-    // #if defined(YULDUZ_BUILD_TYPE_DEBUG)
-    //     LOG_INFO("Press Enter to exit...");
-    //     std::cin.get();
-    // #endif
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
+    LOG_INFO("Press Enter to exit...");
+    std::cin.get();
+#endif
 
     return 0;
 }

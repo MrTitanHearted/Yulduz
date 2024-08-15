@@ -100,6 +100,10 @@ namespace Yulduz {
             glfwDestroyWindow(m_Window);
     }
 
+    void Window::addResizeCallback(void (*callback)(const WindowResizeEvent &event)) {
+        m_ResizeCallbacks.emplace_back([callback](const WindowResizeEvent &event) { callback(event); });
+    }
+
     void Window::setTitle(const std::string &title) {
         glfwSetWindowTitle(m_Window, title.c_str());
     }

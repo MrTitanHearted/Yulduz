@@ -9,7 +9,7 @@ namespace Yulduz {
         return ImGuiInitialized;
     }
 
-    void InitImGui(const ImGuiContext &context) {
+    void InitImGui(const ImGuiSettings &settings) {
         if (ImGuiInitialized) return;
 
         IMGUI_CHECKVERSION();
@@ -22,11 +22,11 @@ namespace Yulduz {
         ImGui::StyleColorsDark();
 
         ImGui_ImplWGPU_InitInfo initInfo{};
-        initInfo.Device = context.Context.get().getDevice();
-        initInfo.RenderTargetFormat = context.Context.get().getConfig().format;
-        initInfo.DepthStencilFormat = static_cast<WGPUTextureFormat>(context.DepthFormat);
+        initInfo.Device = settings.Context.get().getDevice();
+        initInfo.RenderTargetFormat = settings.Context.get().getConfig().format;
+        initInfo.DepthStencilFormat = static_cast<WGPUTextureFormat>(settings.DepthFormat);
 
-        const Window &window = context.Context.get().getWindow();
+        const Window &window = settings.Context.get().getWindow();
         ImGui_ImplGlfw_InitForOther(window.get(), true);
         ImGui_ImplWGPU_Init(&initInfo);
 

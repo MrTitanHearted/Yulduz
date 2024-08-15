@@ -10,13 +10,13 @@
 namespace Yulduz {
     class RenderPass;
 
-    struct ImGuiContext {
+    struct ImGuiSettings {
         TextureFormat DepthFormat = TextureFormat::Depth32Float;
         std::reference_wrapper<const GraphicsContext> Context;
     };
 
     bool IsImGuiInitialized();
-    void InitImGui(const ImGuiContext &context);
+    void InitImGui(const ImGuiSettings &settings);
     void ImGuiFrame(void (*callback)(void));
     void RenderImGuiPass(const RenderPass &renderPass);
     void ShutdownImGui();
