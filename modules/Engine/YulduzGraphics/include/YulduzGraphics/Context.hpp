@@ -7,6 +7,7 @@
 #include <YulduzGraphics/Context/ComputePass.hpp>
 #include <YulduzGraphics/Context/GraphicsContext.hpp>
 #include <YulduzGraphics/Context/Pipeline.hpp>
+#include <YulduzGraphics/Context/RenderBundle.hpp>
 #include <YulduzGraphics/Context/RenderPass.hpp>
 #include <YulduzGraphics/Context/Sampler.hpp>
 #include <YulduzGraphics/Context/Shader.hpp>

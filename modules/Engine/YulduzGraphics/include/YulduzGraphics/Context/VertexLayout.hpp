@@ -16,6 +16,8 @@ namespace Yulduz {
         VertexLayout(std::size_t arrayStride);
         ~VertexLayout() = default;
 
+        inline static VertexLayout New(std::size_t arrayStride) { return VertexLayout(arrayStride); }
+
         VertexLayout &setStepMode(VertexStepMode mode);
         VertexLayout &setAttributes(const std::vector<Attribute> &attributes);
         VertexLayout &addAttribute(VertexFormat format, std::uint64_t offset, std::uint32_t shaderLocation);

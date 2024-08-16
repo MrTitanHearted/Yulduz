@@ -19,16 +19,19 @@ namespace Yulduz {
         ImFont *m_Font;
         ImVec2 m_ViewportSize;
 
-        BindGroupLayout m_FrameBindGroupLayout;
-        ComputePipeline m_FramePipeline;
+        CameraManager m_Camera;
+
         Texture m_Frame;
-        UniformBuffer m_FrameUniform;
-        BindGroup m_FrameBindGroup;
+        RenderBundle m_TriangleRenderBundle;
+        UniformBuffer m_CameraUniformBuffer;
+        UniformBuffer m_ModelUniformBuffer;
+
+        float m_CameraMultiplier;
 
        private:
-        struct FrameData {
-            float DeltaTime;
-            float Time;
+        struct CameraData {
+            glm::mat4 Projection;
+            glm::mat4 View;
         };
 
        private:
@@ -37,11 +40,15 @@ namespace Yulduz {
 
         void run();
         void renderFrame(const Texture &frame);
-        
+
         void renderImGui();
         void resizeFrame();
 
+        void moveCamera();
+
         void keyCallback(const WindowKeyEvent &event);
         void resizeCallback(const WindowResizeEvent &event);
+        void mouseMoveCallback(const WindowMouseMoveEvent &event);
+        void mouseScrollCallback(const WindowMouseScrollEvent &event);
     };
 }  // namespace Yulduz

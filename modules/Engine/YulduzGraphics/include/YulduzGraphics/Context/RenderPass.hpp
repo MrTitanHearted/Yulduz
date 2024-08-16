@@ -4,7 +4,12 @@
 #include <YulduzGraphics/Enums.hpp>
 
 namespace Yulduz {
+    class BindGroup;
+    class VertexBuffer;
+    class IndexBuffer;
     class CommandEncoder;
+    class RenderBundle;
+    class RenderPipeline;
     class Texture;
 
     class ColorAttachment {
@@ -64,7 +69,18 @@ namespace Yulduz {
         RenderPass &operator=(const RenderPass &other);
         RenderPass &operator=(RenderPass &&other);
 
-        void finish();
+        void setPipeline(const RenderPipeline &pipeline);
+        void setBindGroups(const std::vector<BindGroup> &bindGroups);
+        void setBindGroup(std::uint32_t groupIndex, const BindGroup &bindGroup);
+        void setVertexBuffers(const std::vector<VertexBuffer> &vertexBuffers);
+        void setVertexBuffer(std::uint32_t slot, const VertexBuffer &vertexBuffer);
+        void executeBundles(const std::vector<RenderBundle> &bundles);
+        void executeBundle(const RenderBundle &bundle);
+
+        void draw(std::uint32_t slot, const VertexBuffer &vertexBuffer);
+        void drawIndexed(const IndexBuffer &indexBuffer);
+        
+        void finish() const;
 
         WGPURenderPassEncoder get() const;
         std::string getLabel() const;

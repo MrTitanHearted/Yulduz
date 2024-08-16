@@ -1,5 +1,9 @@
 #include <YulduzGraphics/Context/RenderPass.hpp>
+#include <YulduzGraphics/Context/BindGroup.hpp>
+#include <YulduzGraphics/Context/Buffer.hpp>
 #include <YulduzGraphics/Context/CommandEncoder.hpp>
+#include <YulduzGraphics/Context/RenderBundle.hpp>
+#include <YulduzGraphics/Context/Pipeline.hpp>
 #include <YulduzGraphics/Context/Texture.hpp>
 
 namespace Yulduz {
@@ -170,7 +174,73 @@ namespace Yulduz {
         return *this;
     }
 
-    void RenderPass::finish() {
+    void RenderPass::setPipeline(const RenderPipeline &pipeline) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        wgpuRenderPassEncoderSetPipeline(m_RenderPassEncoder, pipeline.get());
+    }
+
+    void RenderPass::setBindGroups(const std::vector<BindGroup> &bindGroups) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        for (std::uint32_t groupIndex = 0; groupIndex < bindGroups.size(); groupIndex++) {
+            wgpuRenderPassEncoderSetBindGroup(m_RenderPassEncoder, groupIndex, bindGroups[groupIndex].get(), 0, nullptr);
+        }
+    }
+
+    void RenderPass::setBindGroup(std::uint32_t groupIndex, const BindGroup &bindGroup) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        wgpuRenderPassEncoderSetBindGroup(m_RenderPassEncoder, groupIndex, bindGroup.get(), 0, nullptr);
+    }
+
+    void RenderPass::setVertexBuffers(const std::vector<VertexBuffer> &vertexBuffers) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        for (std::uint32_t slot = 0; slot < vertexBuffers.size(); slot++) {
+            wgpuRenderPassEncoderSetVertexBuffer(m_RenderPassEncoder, slot, vertexBuffers[slot].get(), 0, vertexBuffers[slot].getSize());
+        }
+    }
+
+    void RenderPass::setVertexBuffer(std::uint32_t slot, const VertexBuffer &vertexBuffer) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        wgpuRenderPassEncoderSetVertexBuffer(m_RenderPassEncoder, slot, vertexBuffer.get(), 0, vertexBuffer.getSize());
+    }
+
+    void RenderPass::executeBundles(const std::vector<RenderBundle> &bundles) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        std::vector<WGPURenderBundle> renderBundles;
+        renderBundles.reserve(bundles.size());
+        for (const RenderBundle &bundle : bundles)
+            renderBundles.emplace_back(bundle.get());
+
+        wgpuRenderPassEncoderExecuteBundles(m_RenderPassEncoder, renderBundles.size(), renderBundles.data());
+    }
+
+    void RenderPass::executeBundle(const RenderBundle &bundle) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        WGPURenderBundle renderBundle = bundle.get();
+        wgpuRenderPassEncoderExecuteBundles(m_RenderPassEncoder, 1, &renderBundle);
+    }
+
+    void RenderPass::draw(std::uint32_t slot, const VertexBuffer &vertexBuffer) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        wgpuRenderPassEncoderSetVertexBuffer(m_RenderPassEncoder, slot, vertexBuffer.get(), 0, vertexBuffer.getSize());
+        wgpuRenderPassEncoderDraw(m_RenderPassEncoder, vertexBuffer.getCount(), 1, 0, 0);
+    }
+
+    void RenderPass::drawIndexed(const IndexBuffer &indexBuffer) {
+        assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
+
+        wgpuRenderPassEncoderSetIndexBuffer(m_RenderPassEncoder, indexBuffer.get(), static_cast<WGPUIndexFormat>(indexBuffer.getIndexFormat()), 0, indexBuffer.getSize());
+        wgpuRenderPassEncoderDrawIndexed(m_RenderPassEncoder, indexBuffer.getCount(), 1, 0, 0, 0);
+    }
+
+    void RenderPass::finish() const {
         assert(m_RenderPassEncoder != nullptr && "RenderPass handle cannot be nullptr");
 
         wgpuRenderPassEncoderEnd(m_RenderPassEncoder);

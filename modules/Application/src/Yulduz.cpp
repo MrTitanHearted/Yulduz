@@ -1,6 +1,27 @@
 #include <Yulduz/Yulduz.hpp>
 
 namespace Yulduz {
+    class Vertex {
+       public:
+        Vertex(glm::vec3 position, glm::vec3 uv) : Position{position}, UV{uv} {}
+        Vertex(float x, float y, float z, float u, float v) : Position{x, y, z}, UV{u, v} {}
+
+        inline static Vertex New(glm::vec3 position, glm::vec3 uv) { return Vertex{position, uv}; }
+        inline static Vertex New(float x, float y, float z, float u, float v) { return Vertex{x, y, z, u, v}; }
+
+       public:
+        glm::vec3 Position;
+        glm::vec2 UV;
+
+        static VertexLayout g_VertexLayout;
+    };
+
+    VertexLayout Vertex::g_VertexLayout = VertexLayout::New(sizeof(Vertex))
+                                              .setAttributes({
+                                                  VertexLayout::Attribute{.Format = VertexFormat::Float32x3, .Offset = offsetof(Vertex, Position), .ShaderLocation = 0},
+                                                  VertexLayout::Attribute{.Format = VertexFormat::Float32x2, .Offset = offsetof(Vertex, UV), .ShaderLocation = 1},
+                                              });
+
     void App::Run() {
         Window::SetEventDispatcher(EventDispatcher::GetDefault());
         App app{};
@@ -25,12 +46,14 @@ namespace Yulduz {
         YZDEBUG("Initializing Yulduz Application");
         m_Context = GraphicsContextBuilder::New()
                         .setBackend(InstanceBackend::Vulkan)
-                        //.setBackend(InstanceBackend::DX12)
+                        // .setBackend(InstanceBackend::DX12)
                         .setPreferredSurfaceFormat(TextureFormat::BGRA8Unorm)
                         .addSurfaceUsage(TextureUsage::CopyDst)
                         .build(m_Window);
         auto &dispatcher = EventDispatcher::GetDefault();
         dispatcher.addCallback<WindowKeyEvent>(&App::keyCallback, this);
+        dispatcher.addCallback<WindowMouseMoveEvent>(&App::mouseMoveCallback, this);
+        dispatcher.addCallback<WindowMouseScrollEvent>(&App::mouseScrollCallback, this);
 
         InitImGui(ImGuiSettings{
             .DepthFormat = TextureFormat::Undefined,
@@ -43,33 +66,74 @@ namespace Yulduz {
         m_DeltaTime = 0.0;
         m_Time = 0.0;
 
-        auto shaderFileOptional = FileAsset::FromPath(YULDUZ_SOURCE_DIR "/assets/shaders/frame.wgsl");
+        auto shaderFileOptional = FileAsset::FromPath(YULDUZ_SOURCE_DIR "/assets/shaders/triangle.wgsl");
         if (!shaderFileOptional) {
             YZFATAL("Failed to open shader file!");
             throw std::runtime_error("Failed to open shader file!");
         }
-        auto computeShader = ShaderBuilder::New().buildWGSL(shaderFileOptional.value(), m_Context);
+        auto textureOptional = TextureAsset::FromPath(YULDUZ_SOURCE_DIR "/assets/textures/awesomeface.png");
+        if (!textureOptional) {
+            YZFATAL("Failed to open texture file!");
+            throw std::runtime_error("Failed to open texture file!");
+        }
 
-        m_FrameBindGroupLayout = BindGroupLayoutBuilder::New()
-                                     .addStorageTexture2D(0, TextureFormat::RGBA8Unorm)
-                                     .addUniformBuffer(1)
-                                     .build(m_Context);
-        auto pipelineLayout = PipelineLayoutBuilder::New()
-                                  .setBindGroupLayouts({m_FrameBindGroupLayout})
-                                  .build(m_Context);
-        m_FramePipeline = ComputePipelineBuilder::New()
-                              .setComputeStateReq(ComputeState::New(computeShader))
-                              .build(pipelineLayout, m_Context);
+        auto triangleShader = ShaderBuilder::New().buildWGSL(shaderFileOptional.value(), m_Context);
+        auto sampler = SamplerBuilder::New().build(m_Context);
+        auto texture = TextureBuilder::New().build(textureOptional.value(), m_Context);
+
         m_Frame = TextureBuilder::New()
-                      .setUsage(TextureUsage::StorageBinding | TextureUsage::CopySrc | TextureUsage::CopyDst)
-                      .setFormat(TextureFormat::RGBA8Unorm)
+                      .setUsage(TextureUsage::RenderAttachment | TextureUsage::CopySrc | TextureUsage::CopyDst)
+                      .setFormat(m_Context.getSurfaceFormat())
                       .empty2d(1, 1, m_Context);
-        m_FrameUniform = BufferBuilder::New()
-                             .emptyUniform(sizeof(FrameData), m_Context);
-        m_FrameBindGroup = BindGroupBuilder::New()
-                               .addTexture(0, m_Frame)
-                               .addUniformBuffer(1, m_FrameUniform)
-                               .build(m_FrameBindGroupLayout, m_Context);
+
+        auto cameraBindGroupLayout = BindGroupLayoutBuilder::New()
+                                         .addUniformBuffer(0)
+                                         .addUniformBuffer(1)
+                                         .build(m_Context);
+        auto triangleBindGroupLayout = BindGroupLayoutBuilder::New()
+                                           .addSampler(0)
+                                           .addTexture2D(1)
+                                           .build(m_Context);
+        auto trianglePipelineLayout = PipelineLayoutBuilder::New()
+                                          .setBindGroupLayouts({cameraBindGroupLayout, triangleBindGroupLayout})
+                                          .build(m_Context);
+        auto trianglePipeline = RenderPipelineBuilder::New()
+                                    .setFragmentStateReq(FragmentState::New(triangleShader).addColorTargetState(ColorTargetState::New(m_Frame.getFormat())))
+                                    .setVertexStateReq(VertexState::New(triangleShader).addVertexLayout(Vertex::g_VertexLayout))
+                                    .build(trianglePipelineLayout, m_Context);
+
+        m_CameraUniformBuffer = BufferBuilder::New().emptyUniform(sizeof(CameraData), m_Context);
+        m_ModelUniformBuffer = BufferBuilder::New().emptyUniform(sizeof(glm::mat4), m_Context);
+
+        auto cameraBindGroup = BindGroupBuilder::New()
+                                   .addUniformBuffer(0, m_ModelUniformBuffer)
+                                   .addUniformBuffer(1, m_CameraUniformBuffer)
+                                   .build(cameraBindGroupLayout, m_Context);
+        auto triangleBindGroup = BindGroupBuilder::New()
+                                     .addSampler(0, sampler)
+                                     .addTexture(1, texture)
+                                     .build(triangleBindGroupLayout, m_Context);
+        auto triangleVertexBuffer =
+            BufferBuilder::New().buildVertex<Vertex>(
+                {
+                    Vertex::New(-1.0, -1.0, 0.0, 0.0, 0.0),
+                    Vertex::New(0.0, 1.0, 0.0, 0.5, 1.0),
+                    Vertex::New(1.0, -1.0, 0.0, 1.0, 0.0),
+                },
+                m_Context);
+        auto triangleIndexBuffer =
+            BufferBuilder::New().buildIndex(std::vector<std::uint32_t>{0, 1, 2}, m_Context);
+
+        auto triangleRenderBundleEncoder = RenderBundleEncoderBuilder::New()
+                                               .addColorFormat(m_Frame.getFormat())
+                                               .build(m_Context);
+        triangleRenderBundleEncoder.setPipeline(trianglePipeline);
+        triangleRenderBundleEncoder.setBindGroups({cameraBindGroup, triangleBindGroup});
+        triangleRenderBundleEncoder.setVertexBuffer(0, triangleVertexBuffer);
+        triangleRenderBundleEncoder.drawIndexed(triangleIndexBuffer);
+        m_TriangleRenderBundle = triangleRenderBundleEncoder.finish();
+
+        m_CameraMultiplier = 20.0f;
     }
 
     App::~App() {
@@ -87,6 +151,8 @@ namespace Yulduz {
             Window::PollEvents();
             dispatcher.dispatch();
 
+            moveCamera();
+
             ImGuiFrame(&App::renderImGui, this);
 
             m_Context.renderFrame(&App::renderFrame, this);
@@ -100,23 +166,27 @@ namespace Yulduz {
     void App::renderFrame(const Texture &frame) {
         auto commandEncoder = CommandEncoderBuilder::New().build(m_Context);
         {
-            FrameData data{
-                .DeltaTime = (float)m_DeltaTime,
-                .Time = (float)m_Time,
+            glm::mat4 modelData{1.0f};
+            CameraData cameraData{
+                .Projection = m_Camera.getProjection(),
+                .View = m_Camera.getView(),
             };
-            m_FrameUniform.write(&data);
 
-            auto [width, height] = m_Frame.getSize2D();
+            m_ModelUniformBuffer.write(&modelData);
+            m_CameraUniformBuffer.write(&cameraData);
 
-            auto computePass = ComputePassBuilder::New().build(commandEncoder);
-            computePass.setPipeline(m_FramePipeline);
-            computePass.setBindGroups({m_FrameBindGroup});
-            computePass.dispatch({(width + 15) / 16, (height + 15) / 16, 1});
-            computePass.finish();
+            auto renderPass = RenderPassBuilder::New()
+                                  .setLabel("Triangle Pass")
+                                  .setColorAttachments({ColorAttachment::New(m_Frame).setClearColor3({0.2f, 0.3f, 0.3f})})
+                                  .build(commandEncoder);
+            renderPass.executeBundle(m_TriangleRenderBundle);
+            renderPass.finish();
         }
+
         {
             auto renderPass = RenderPassBuilder::New()
-                                  .setColorAttachments({ColorAttachment::New(frame).setClearColor3({0.2f, 0.3f, 0.3f})})
+                                  .setLabel("ImGui Pass")
+                                  .setColorAttachments({ColorAttachment::New(frame)})
                                   .build(commandEncoder);
             RenderImGuiPass(renderPass);
             renderPass.finish();
@@ -126,7 +196,7 @@ namespace Yulduz {
     }
 
     void App::renderImGui() {
-                ImGuiIO &io = ImGui::GetIO();
+        ImGuiIO &io = ImGui::GetIO();
         ImGui::DockSpaceOverViewport();
         ImGui::PushFont(m_Font);
 
@@ -136,6 +206,10 @@ namespace Yulduz {
         ImGui::Text("Time: %.6f", m_Time);
         ImGui::Text("Delta Time: %.6f", m_DeltaTime);
         ImGui::Text("Backend Type: %s", GetBackendTypeName(m_Context.getBackendType()));
+        ImGui::End();
+
+        ImGui::Begin("Settings");
+        ImGui::DragFloat("Camera Multiplier when pressed Shift key:", &m_CameraMultiplier, 0.1f, 1.0f, 100.0f);
         ImGui::End();
 
         ImGui::Begin("Present Mode");
@@ -158,8 +232,8 @@ namespace Yulduz {
         m_ViewportSize = ImGui::GetContentRegionAvail();
         resizeFrame();
 
-        ImGui::Image(m_Frame.getDefaultView(), m_ViewportSize, ImVec2{0, 1}, ImVec2{1, 0});
-        
+        ImGui::Image(m_Frame.getDefaultView(), m_ViewportSize);
+
         ImGui::End();
         ImGui::PopStyleVar();
 
@@ -172,26 +246,70 @@ namespace Yulduz {
         if (width == prevWidth && height == prevHeight) return;
 
         m_Frame.resize2D(width, height);
-        m_FrameBindGroup = BindGroupBuilder::New()
-                               .addTexture(0, m_Frame)
-                               .addUniformBuffer(1, m_FrameUniform)
-                               .build(m_FrameBindGroupLayout, m_Context);
+        m_Camera.setAspectRatio(static_cast<float>(width) / static_cast<float>(height));
+    }
+
+    void App::moveCamera() {
+        if (!m_Window.isMouseButtonDown(MouseButton::Right)) {
+            if (m_Window.getCursorMode() != CursorMode::Normal)
+                m_Window.setCursorMode(CursorMode::Normal);
+            m_Camera.setFirstMouse(true);
+            return;
+        }
+
+        if (m_Window.getCursorMode() != CursorMode::Disabled)
+            m_Window.setCursorMode(CursorMode::Disabled);
+
+        if (m_Window.isKeyDown(KeyCode::W))
+            m_Camera.move(CameraMovement::WorldForward, m_DeltaTime);
+        if (m_Window.isKeyDown(KeyCode::S))
+            m_Camera.move(CameraMovement::WorldBackward, m_DeltaTime);
+        if (m_Window.isKeyDown(KeyCode::D))
+            m_Camera.move(CameraMovement::Right, m_DeltaTime);
+        if (m_Window.isKeyDown(KeyCode::A))
+            m_Camera.move(CameraMovement::Left, m_DeltaTime);
+        if (m_Window.isKeyDown(KeyCode::E))
+            m_Camera.move(CameraMovement::WorldUp, m_DeltaTime);
+        if (m_Window.isKeyDown(KeyCode::Q))
+            m_Camera.move(CameraMovement::WorldDown, m_DeltaTime);
     }
 
     void App::keyCallback(const WindowKeyEvent &event) {
-        if (event.action != KeyAction::Press) return;
-        if (event.key == KeyCode::Escape) m_Window.close();
-        if (event.key == KeyCode::F) {
-            if (m_Window.isFullscreen())
-                m_Window.makeWindowed();
-            else
-                m_Window.makeFullscreen();
-            auto [width, height] = m_Window.getSize();
-            m_Context.resize(width, height);
+        if (event.action == KeyAction::Press) {
+            if (event.key == KeyCode::Escape) m_Window.close();
+            if (event.key == KeyCode::F) {
+                if (m_Window.isFullscreen())
+                    m_Window.makeWindowed();
+                else
+                    m_Window.makeFullscreen();
+                auto [width, height] = m_Window.getSize();
+                m_Context.resize(width, height);
+            }
+            if (event.key == KeyCode::LeftShift || event.key == KeyCode::RightShift)
+                m_Camera.setSpeed(m_Camera.getSpeed() * m_CameraMultiplier);
+        } else if (event.action == KeyAction::Release) {
+            if (event.key == KeyCode::LeftShift || event.key == KeyCode::RightShift)
+                m_Camera.setSpeed(m_Camera.getSpeed() / m_CameraMultiplier);
         }
     }
 
     void App::resizeCallback(const WindowResizeEvent &event) {
         m_Context.resize(event.width, event.height);
+    }
+
+    void App::mouseMoveCallback(const WindowMouseMoveEvent &event) {
+        if (m_Window.isMouseButtonDown(MouseButton::Right)) {
+            m_Window.setCursorMode(CursorMode::Disabled);
+            m_Camera.moveMouse(event.x, event.y);
+        } else {
+            if (m_Window.getCursorMode() != CursorMode::Normal)
+                m_Window.setCursorMode(CursorMode::Normal);
+            m_Camera.setFirstMouse(true);
+        }
+    }
+
+    void App::mouseScrollCallback(const WindowMouseScrollEvent &event) {
+        if (!m_Window.isMouseButtonDown(MouseButton::Right)) return;
+        m_Camera.scrollMouse(event.yOffset);
     }
 }  // namespace Yulduz
