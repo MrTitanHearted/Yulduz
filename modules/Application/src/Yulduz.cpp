@@ -23,7 +23,7 @@ namespace Yulduz {
                                               });
 
     void App::Run() {
-        Window::SetEventDispatcher(EventDispatcher::GetDefault());
+        Window::SetEventObserver(EventObserver::GetDefault());
         App app{};
 
         try {
@@ -42,7 +42,6 @@ namespace Yulduz {
               .Width = 1200,
               .Height = 800,
           }} {
-        m_Window.addResizeCallback(&App::resizeCallback, this);
         YZDEBUG("Initializing Yulduz Application");
         m_Context = GraphicsContextBuilder::New()
                         .setBackend(InstanceBackend::Vulkan)
@@ -50,10 +49,11 @@ namespace Yulduz {
                         .setPreferredSurfaceFormat(TextureFormat::BGRA8Unorm)
                         .addSurfaceUsage(TextureUsage::CopyDst)
                         .build(m_Window);
-        auto &dispatcher = EventDispatcher::GetDefault();
-        dispatcher.addCallback<WindowKeyEvent>(&App::keyCallback, this);
-        dispatcher.addCallback<WindowMouseMoveEvent>(&App::mouseMoveCallback, this);
-        dispatcher.addCallback<WindowMouseScrollEvent>(&App::mouseScrollCallback, this);
+        auto &observer = EventObserver::GetDefault();
+        observer.addCallback<WindowResizeEvent>(&App::resizeCallback, this);
+        observer.addCallback<WindowKeyEvent>(&App::keyCallback, this);
+        observer.addCallback<WindowMouseMoveEvent>(&App::mouseMoveCallback, this);
+        observer.addCallback<WindowMouseScrollEvent>(&App::mouseScrollCallback, this);
 
         InitImGui(ImGuiSettings{
             .DepthFormat = TextureFormat::Undefined,
@@ -106,8 +106,8 @@ namespace Yulduz {
         m_ModelUniformBuffer = BufferBuilder::New().emptyUniform(sizeof(glm::mat4), m_Context);
 
         auto cameraBindGroup = BindGroupBuilder::New()
-                                   .addUniformBuffer(0, m_ModelUniformBuffer)
-                                   .addUniformBuffer(1, m_CameraUniformBuffer)
+                                   .addBuffer(0, m_ModelUniformBuffer)
+                                   .addBuffer(1, m_CameraUniformBuffer)
                                    .build(cameraBindGroupLayout, m_Context);
         auto triangleBindGroup = BindGroupBuilder::New()
                                      .addSampler(0, sampler)
@@ -143,13 +143,11 @@ namespace Yulduz {
 
     void App::run() {
         static Milliseconds::Timer timer;
-        EventDispatcher &dispatcher = EventDispatcher::GetDefault();
 
         while (m_Window.isRunning()) {
             timer.start();
 
             Window::PollEvents();
-            dispatcher.dispatch();
 
             moveCamera();
 
@@ -209,7 +207,9 @@ namespace Yulduz {
         ImGui::End();
 
         ImGui::Begin("Settings");
-        ImGui::DragFloat("Camera Multiplier when pressed Shift key:", &m_CameraMultiplier, 0.1f, 1.0f, 100.0f);
+        ImGui::Text("Camera Multiplier when pressed Shift key:");
+        ImGui::SameLine();
+        ImGui::DragFloat("##DragFloat", &m_CameraMultiplier, 0.1f, 1.0f, 100.0f);
         ImGui::End();
 
         ImGui::Begin("Present Mode");

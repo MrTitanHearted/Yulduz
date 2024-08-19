@@ -17,7 +17,7 @@ namespace Yulduz {
         };
 
        public:
-        static void SetEventDispatcher(EventDispatcher &dispatcher);
+        static void SetEventObserver(EventObserver &observer);
         static void PollEvents();
 
        public:
@@ -30,7 +30,6 @@ namespace Yulduz {
         Window(const Window &) = delete;
         Window &operator=(const Window &) = delete;
 
-        void addResizeCallback(void (*callback)(const WindowResizeEvent &event));
         void setTitle(const std::string &title);
         void setSize(std::uint32_t width, std::uint32_t height);
         void setWidth(std::uint32_t width);
@@ -79,12 +78,6 @@ namespace Yulduz {
         bool isMouseButtonUp(MouseButton button) const;
 
         WGPUSurface getWGPUSurface(WGPUInstance instance) const;
-
-        template <typename T>
-        void addResizeCallback(void (T::*callback)(const WindowResizeEvent &event), T *self) {
-            m_ResizeCallbacks.emplace_back([callback, self](const WindowResizeEvent &event) { (self->*callback)(event); });
-        }
-
        private:
         class GlfwState {
            public:
@@ -104,9 +97,7 @@ namespace Yulduz {
         bool m_MouseButtons[GLFW_MOUSE_BUTTON_LAST + 1];
 
         static GlfwState g_GlfwState;
-        static EventDispatcher *g_EventDispatcher;
-
-        std::vector<std::function<void(const WindowResizeEvent &)>> m_ResizeCallbacks;
+        static EventObserver *g_EventObserver;
 
        private:
 #if defined(YULDUZ_BUILD_TYPE_DEBUG)

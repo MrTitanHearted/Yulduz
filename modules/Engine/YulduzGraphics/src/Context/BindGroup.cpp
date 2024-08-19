@@ -451,13 +451,13 @@ namespace Yulduz {
         return *this;
     }
 
-    BindGroupBuilder &BindGroupBuilder::addStorageBuffer(std::uint32_t binding, const StorageBuffer &buffer) {
+    BindGroupBuilder &BindGroupBuilder::addBuffer(std::uint32_t binding, const StorageBuffer &buffer) {
         m_Entries.emplace_back(WGPUBindGroupEntry{.binding = binding, .buffer = buffer.get(), .size = buffer.getSize()});
         m_Buffers.emplace_back(buffer);
         return *this;
     }
 
-    BindGroupBuilder &BindGroupBuilder::addUniformBuffer(std::uint32_t binding, const UniformBuffer &buffer) {
+    BindGroupBuilder &BindGroupBuilder::addBuffer(std::uint32_t binding, const UniformBuffer &buffer) {
         m_Entries.emplace_back(WGPUBindGroupEntry{.binding = binding, .buffer = buffer.get(), .size = buffer.getSize()});
         m_Buffers.emplace_back(buffer);
         return *this;

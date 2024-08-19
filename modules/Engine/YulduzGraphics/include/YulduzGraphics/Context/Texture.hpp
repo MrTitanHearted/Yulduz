@@ -138,14 +138,19 @@ namespace Yulduz {
                 break;
             case WGPUSurfaceGetCurrentTextureStatus_Timeout:
                 YZERROR("Failed to get Surface Texture: Timeout");
+                return;
             case WGPUSurfaceGetCurrentTextureStatus_Outdated:
                 YZERROR("Failed to get Surface Texture: Outdated");
+                return;
             case WGPUSurfaceGetCurrentTextureStatus_Lost:
                 YZERROR("Failed to get Surface Texture: Lost");
+                return;
             case WGPUSurfaceGetCurrentTextureStatus_OutOfMemory:
                 YZERROR("Failed to get Surface Texture: Out of memory");
+                return;
             case WGPUSurfaceGetCurrentTextureStatus_DeviceLost:
                 YZERROR("Failed to get Surface Texture: Device lost");
+                return;
             case WGPUSurfaceGetCurrentTextureStatus_Force32:
                 YZERROR("Failed to get Surface Texture");
                 return;

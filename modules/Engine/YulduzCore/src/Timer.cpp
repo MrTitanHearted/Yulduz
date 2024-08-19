@@ -5,6 +5,7 @@
 
 namespace Yulduz {
     EventDispatcher EventDispatcher::g_EventDispatcher{};
+    EventObserver EventObserver::g_EventObserver{};
 
     void Timer::start() {
         m_Start = Clock::now();

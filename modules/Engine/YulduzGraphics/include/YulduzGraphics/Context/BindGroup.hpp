@@ -210,8 +210,8 @@ namespace Yulduz {
         inline static BindGroupBuilder New() { return BindGroupBuilder(); }
 
         BindGroupBuilder &setLabel(const std::string &label);
-        BindGroupBuilder &addStorageBuffer(std::uint32_t binding, const StorageBuffer &buffer);
-        BindGroupBuilder &addUniformBuffer(std::uint32_t binding, const UniformBuffer &buffer);
+        BindGroupBuilder &addBuffer(std::uint32_t binding, const StorageBuffer &buffer);
+        BindGroupBuilder &addBuffer(std::uint32_t binding, const UniformBuffer &buffer);
         BindGroupBuilder &addSampler(std::uint32_t binding, const Sampler &sampler);
         BindGroupBuilder &addTexture(std::uint32_t binding, const Texture &texture);
         BindGroupBuilder &addTexture(std::uint32_t binding, const TextureView &view);

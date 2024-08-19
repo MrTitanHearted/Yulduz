@@ -9,10 +9,10 @@
 
 namespace Yulduz {
     Window::GlfwState Window::g_GlfwState{};
-    EventDispatcher *Window::g_EventDispatcher{nullptr};
+    EventObserver *Window::g_EventObserver{nullptr};
 
-    void Window::SetEventDispatcher(EventDispatcher &dispatcher) {
-        g_EventDispatcher = &dispatcher;
+    void Window::SetEventObserver(EventObserver &observer) {
+        g_EventObserver = &observer;
     }
 
     void Window::PollEvents() {
@@ -20,7 +20,7 @@ namespace Yulduz {
     }
 
     Window::Window(const Settings &settings) {
-        assert(g_EventDispatcher != nullptr && "EventDispatcher must be set first");
+        assert(g_EventObserver != nullptr && "EventObserver must be set first");
         YZDEBUG("Initializing Window: '{}'", settings.Title);
 
         glfwWindowHint(GLFW_RESIZABLE, settings.Resizable ? GLFW_TRUE : GLFW_FALSE);
@@ -65,19 +65,19 @@ namespace Yulduz {
         std::fill(std::begin(m_MouseButtons), std::end(m_MouseButtons), false);
 
 #if defined(YULDUZ_BUILD_TYPE_DEBUG)
-        g_EventDispatcher->addCallback<WindowCloseEvent>(&Window::closeCallback, this);
-        g_EventDispatcher->addCallback<WindowResizeEvent>(&Window::resizeCallback, this);
-        g_EventDispatcher->addCallback<WindowMoveEvent>(&Window::moveCallback, this);
-        g_EventDispatcher->addCallback<WindowContentScaleEvent>(&Window::contentScaleCallback, this);
-        g_EventDispatcher->addCallback<WindowMouseMoveEvent>(&Window::mouseMoveCallback, this);
-        g_EventDispatcher->addCallback<WindowMaximizeEvent>(&Window::maximizeCallback, this);
-        g_EventDispatcher->addCallback<WindowMinimizeEvent>(&Window::minimizeCallback, this);
-        g_EventDispatcher->addCallback<WindowGainFocusEvent>(&Window::gainFocusCallback, this);
-        g_EventDispatcher->addCallback<WindowLoseFocusEvent>(&Window::loseFocusCallback, this);
-        g_EventDispatcher->addCallback<WindowKeyEvent>(&Window::keyCallback, this);
-        g_EventDispatcher->addCallback<WindowCharEvent>(&Window::charCallback, this);
-        g_EventDispatcher->addCallback<WindowMouseButtonEvent>(&Window::mouseButtonCallback, this);
-        g_EventDispatcher->addCallback<WindowMouseScrollEvent>(&Window::mouseScrollCallback, this);
+        g_EventObserver->addCallback<WindowCloseEvent>(&Window::closeCallback, this);
+        g_EventObserver->addCallback<WindowResizeEvent>(&Window::resizeCallback, this);
+        g_EventObserver->addCallback<WindowMoveEvent>(&Window::moveCallback, this);
+        g_EventObserver->addCallback<WindowContentScaleEvent>(&Window::contentScaleCallback, this);
+        g_EventObserver->addCallback<WindowMouseMoveEvent>(&Window::mouseMoveCallback, this);
+        g_EventObserver->addCallback<WindowMaximizeEvent>(&Window::maximizeCallback, this);
+        g_EventObserver->addCallback<WindowMinimizeEvent>(&Window::minimizeCallback, this);
+        g_EventObserver->addCallback<WindowGainFocusEvent>(&Window::gainFocusCallback, this);
+        g_EventObserver->addCallback<WindowLoseFocusEvent>(&Window::loseFocusCallback, this);
+        g_EventObserver->addCallback<WindowKeyEvent>(&Window::keyCallback, this);
+        g_EventObserver->addCallback<WindowCharEvent>(&Window::charCallback, this);
+        g_EventObserver->addCallback<WindowMouseButtonEvent>(&Window::mouseButtonCallback, this);
+        g_EventObserver->addCallback<WindowMouseScrollEvent>(&Window::mouseScrollCallback, this);
 #endif
 
         m_PrevWidth = 0;
@@ -98,10 +98,6 @@ namespace Yulduz {
 
         if (m_Window)
             glfwDestroyWindow(m_Window);
-    }
-
-    void Window::addResizeCallback(void (*callback)(const WindowResizeEvent &event)) {
-        m_ResizeCallbacks.emplace_back([callback](const WindowResizeEvent &event) { callback(event); });
     }
 
     void Window::setTitle(const std::string &title) {

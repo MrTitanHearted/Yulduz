@@ -109,5 +109,10 @@ namespace Yulduz {
                 callback(&event);
             }
         }
+
+        static EventObserver &GetDefault() { return g_EventObserver; }
+
+       private:
+        static EventObserver g_EventObserver;
     };
 }  // namespace Yulduz
