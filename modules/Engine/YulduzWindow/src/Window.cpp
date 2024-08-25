@@ -9,18 +9,12 @@
 
 namespace Yulduz {
     Window::GlfwState Window::g_GlfwState{};
-    EventObserver *Window::g_EventObserver{nullptr};
-
-    void Window::SetEventObserver(EventObserver &observer) {
-        g_EventObserver = &observer;
-    }
 
     void Window::PollEvents() {
         glfwPollEvents();
     }
 
     Window::Window(const Settings &settings) {
-        assert(g_EventObserver != nullptr && "EventObserver must be set first");
         YZDEBUG("Initializing Window: '{}'", settings.Title);
 
         glfwWindowHint(GLFW_RESIZABLE, settings.Resizable ? GLFW_TRUE : GLFW_FALSE);
@@ -65,19 +59,20 @@ namespace Yulduz {
         std::fill(std::begin(m_MouseButtons), std::end(m_MouseButtons), false);
 
 #if defined(YULDUZ_BUILD_TYPE_DEBUG)
-        g_EventObserver->addCallback<WindowCloseEvent>(&Window::closeCallback, this);
-        g_EventObserver->addCallback<WindowResizeEvent>(&Window::resizeCallback, this);
-        g_EventObserver->addCallback<WindowMoveEvent>(&Window::moveCallback, this);
-        g_EventObserver->addCallback<WindowContentScaleEvent>(&Window::contentScaleCallback, this);
-        g_EventObserver->addCallback<WindowMouseMoveEvent>(&Window::mouseMoveCallback, this);
-        g_EventObserver->addCallback<WindowMaximizeEvent>(&Window::maximizeCallback, this);
-        g_EventObserver->addCallback<WindowMinimizeEvent>(&Window::minimizeCallback, this);
-        g_EventObserver->addCallback<WindowGainFocusEvent>(&Window::gainFocusCallback, this);
-        g_EventObserver->addCallback<WindowLoseFocusEvent>(&Window::loseFocusCallback, this);
-        g_EventObserver->addCallback<WindowKeyEvent>(&Window::keyCallback, this);
-        g_EventObserver->addCallback<WindowCharEvent>(&Window::charCallback, this);
-        g_EventObserver->addCallback<WindowMouseButtonEvent>(&Window::mouseButtonCallback, this);
-        g_EventObserver->addCallback<WindowMouseScrollEvent>(&Window::mouseScrollCallback, this);
+        EventObserver &observer = EventObserver::GetDefault();
+        m_WindowCloseCallbackIndex = observer.addCallback<WindowCloseEvent>(&Window::closeCallback, this);
+        m_WindowResizeCallbackIndex = observer.addCallback<WindowResizeEvent>(&Window::resizeCallback, this);
+        m_WindowMoveCallbackIndex = observer.addCallback<WindowMoveEvent>(&Window::moveCallback, this);
+        m_WindowContentScaleCallbackIndex = observer.addCallback<WindowContentScaleEvent>(&Window::contentScaleCallback, this);
+        m_WindowMouseMoveCallbackIndex = observer.addCallback<WindowMouseMoveEvent>(&Window::mouseMoveCallback, this);
+        m_WindowMaximizeCallbackIndex = observer.addCallback<WindowMaximizeEvent>(&Window::maximizeCallback, this);
+        m_WindowMinimizeCallbackIndex = observer.addCallback<WindowMinimizeEvent>(&Window::minimizeCallback, this);
+        m_WindowGainFocusCallbackIndex = observer.addCallback<WindowGainFocusEvent>(&Window::gainFocusCallback, this);
+        m_WindowLoseFocusCallbackIndex = observer.addCallback<WindowLoseFocusEvent>(&Window::loseFocusCallback, this);
+        m_WindowKeyCallbackIndex = observer.addCallback<WindowKeyEvent>(&Window::keyCallback, this);
+        m_WindowCharCallbackIndex = observer.addCallback<WindowCharEvent>(&Window::charCallback, this);
+        m_WindowMouseButtonCallbackIndex = observer.addCallback<WindowMouseButtonEvent>(&Window::mouseButtonCallback, this);
+        m_WindowMouseScrollCallbackIndex = observer.addCallback<WindowMouseScrollEvent>(&Window::mouseScrollCallback, this);
 #endif
 
         m_PrevWidth = 0;
@@ -93,78 +88,231 @@ namespace Yulduz {
         }
     }
 
+    Window::Window()
+        : m_Window{nullptr},
+          m_PrevWidth{},
+          m_PrevHeight{},
+          m_PrevX{},
+          m_PrevY{},
+          m_KeyMods{KeyMod::None},
+          m_Keys{},
+          m_MouseButtons{} {}
+
     Window::~Window() {
+        if (!m_Window) return;
         YZDEBUG("Releasing Window: '{}'", getTitle());
 
-        if (m_Window)
-            glfwDestroyWindow(m_Window);
+        glfwDestroyWindow(m_Window);
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
+        EventObserver &observer = EventObserver::GetDefault();
+        observer.remove<WindowCloseEvent>(m_WindowCloseCallbackIndex);
+        observer.remove<WindowResizeEvent>(m_WindowResizeCallbackIndex);
+        observer.remove<WindowMoveEvent>(m_WindowMoveCallbackIndex);
+        observer.remove<WindowContentScaleEvent>(m_WindowContentScaleCallbackIndex);
+        observer.remove<WindowMouseMoveEvent>(m_WindowMouseMoveCallbackIndex);
+        observer.remove<WindowMaximizeEvent>(m_WindowMaximizeCallbackIndex);
+        observer.remove<WindowMinimizeEvent>(m_WindowMinimizeCallbackIndex);
+        observer.remove<WindowGainFocusEvent>(m_WindowGainFocusCallbackIndex);
+        observer.remove<WindowLoseFocusEvent>(m_WindowLoseFocusCallbackIndex);
+        observer.remove<WindowKeyEvent>(m_WindowKeyCallbackIndex);
+        observer.remove<WindowCharEvent>(m_WindowCharCallbackIndex);
+        observer.remove<WindowMouseButtonEvent>(m_WindowMouseButtonCallbackIndex);
+        observer.remove<WindowMouseScrollEvent>(m_WindowMouseScrollCallbackIndex);
+#endif
+    }
+
+    Window::Window(Window &&other)
+        : m_Window{other.m_Window},
+          m_PrevWidth{other.m_PrevWidth},
+          m_PrevHeight{other.m_PrevHeight},
+          m_PrevX{other.m_PrevX},
+          m_PrevY{other.m_PrevY},
+          m_KeyMods{other.m_KeyMods},
+          m_Keys{std::move(other.m_Keys)},
+          m_MouseButtons{std::move(other.m_MouseButtons)} {
+        assert(other.m_Window != nullptr && "GLFWwindow cannot be nullptr");
+        glfwSetWindowUserPointer(m_Window, this);
+        other.m_Window = nullptr;
+        other.m_PrevWidth = 0;
+        other.m_PrevHeight = 0;
+        other.m_PrevX = 0;
+        other.m_PrevY = 0;
+        other.m_KeyMods = KeyMod::None;
+        std::fill(std::begin(other.m_Keys), std::end(other.m_Keys), false);
+        std::fill(std::begin(other.m_MouseButtons), std::end(other.m_MouseButtons), false);
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
+        EventObserver &observer = EventObserver::GetDefault();
+        observer.remove<WindowCloseEvent>(other.m_WindowCloseCallbackIndex);
+        observer.remove<WindowResizeEvent>(other.m_WindowResizeCallbackIndex);
+        observer.remove<WindowMoveEvent>(other.m_WindowMoveCallbackIndex);
+        observer.remove<WindowContentScaleEvent>(other.m_WindowContentScaleCallbackIndex);
+        observer.remove<WindowMouseMoveEvent>(other.m_WindowMouseMoveCallbackIndex);
+        observer.remove<WindowMaximizeEvent>(other.m_WindowMaximizeCallbackIndex);
+        observer.remove<WindowMinimizeEvent>(other.m_WindowMinimizeCallbackIndex);
+        observer.remove<WindowGainFocusEvent>(other.m_WindowGainFocusCallbackIndex);
+        observer.remove<WindowLoseFocusEvent>(other.m_WindowLoseFocusCallbackIndex);
+        observer.remove<WindowKeyEvent>(other.m_WindowKeyCallbackIndex);
+        observer.remove<WindowCharEvent>(other.m_WindowCharCallbackIndex);
+        observer.remove<WindowMouseButtonEvent>(other.m_WindowMouseButtonCallbackIndex);
+        observer.remove<WindowMouseScrollEvent>(other.m_WindowMouseScrollCallbackIndex);
+        m_WindowCloseCallbackIndex = observer.addCallback<WindowCloseEvent>(&Window::closeCallback, this);
+        m_WindowResizeCallbackIndex = observer.addCallback<WindowResizeEvent>(&Window::resizeCallback, this);
+        m_WindowMoveCallbackIndex = observer.addCallback<WindowMoveEvent>(&Window::moveCallback, this);
+        m_WindowContentScaleCallbackIndex = observer.addCallback<WindowContentScaleEvent>(&Window::contentScaleCallback, this);
+        m_WindowMouseMoveCallbackIndex = observer.addCallback<WindowMouseMoveEvent>(&Window::mouseMoveCallback, this);
+        m_WindowMaximizeCallbackIndex = observer.addCallback<WindowMaximizeEvent>(&Window::maximizeCallback, this);
+        m_WindowMinimizeCallbackIndex = observer.addCallback<WindowMinimizeEvent>(&Window::minimizeCallback, this);
+        m_WindowGainFocusCallbackIndex = observer.addCallback<WindowGainFocusEvent>(&Window::gainFocusCallback, this);
+        m_WindowLoseFocusCallbackIndex = observer.addCallback<WindowLoseFocusEvent>(&Window::loseFocusCallback, this);
+        m_WindowKeyCallbackIndex = observer.addCallback<WindowKeyEvent>(&Window::keyCallback, this);
+        m_WindowCharCallbackIndex = observer.addCallback<WindowCharEvent>(&Window::charCallback, this);
+        m_WindowMouseButtonCallbackIndex = observer.addCallback<WindowMouseButtonEvent>(&Window::mouseButtonCallback, this);
+        m_WindowMouseScrollCallbackIndex = observer.addCallback<WindowMouseScrollEvent>(&Window::mouseScrollCallback, this);
+#endif
+    }
+
+    Window &Window::operator=(Window &&other) {
+        assert(other.m_Window != nullptr && "GLFWwindow cannot be nullptr");
+
+        if (&other != this) {
+            if (m_Window) glfwDestroyWindow(m_Window);
+
+            m_Window = other.m_Window;
+            m_PrevWidth = other.m_PrevWidth;
+            m_PrevHeight = other.m_PrevHeight;
+            m_PrevX = other.m_PrevX;
+            m_PrevY = other.m_PrevY;
+            m_KeyMods = other.m_KeyMods;
+            m_Keys = std::move(other.m_Keys);
+            m_MouseButtons = std::move(other.m_MouseButtons);
+            glfwSetWindowUserPointer(m_Window, this);
+
+            other.m_Window = nullptr;
+            other.m_PrevWidth = 0;
+            other.m_PrevHeight = 0;
+            other.m_PrevX = 0;
+            other.m_PrevY = 0;
+            other.m_KeyMods = KeyMod::None;
+            std::fill(std::begin(other.m_Keys), std::end(other.m_Keys), false);
+            std::fill(std::begin(other.m_MouseButtons), std::end(other.m_MouseButtons), false);
+
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
+        EventObserver &observer = EventObserver::GetDefault();
+        observer.remove<WindowCloseEvent>(other.m_WindowCloseCallbackIndex);
+        observer.remove<WindowResizeEvent>(other.m_WindowResizeCallbackIndex);
+        observer.remove<WindowMoveEvent>(other.m_WindowMoveCallbackIndex);
+        observer.remove<WindowContentScaleEvent>(other.m_WindowContentScaleCallbackIndex);
+        observer.remove<WindowMouseMoveEvent>(other.m_WindowMouseMoveCallbackIndex);
+        observer.remove<WindowMaximizeEvent>(other.m_WindowMaximizeCallbackIndex);
+        observer.remove<WindowMinimizeEvent>(other.m_WindowMinimizeCallbackIndex);
+        observer.remove<WindowGainFocusEvent>(other.m_WindowGainFocusCallbackIndex);
+        observer.remove<WindowLoseFocusEvent>(other.m_WindowLoseFocusCallbackIndex);
+        observer.remove<WindowKeyEvent>(other.m_WindowKeyCallbackIndex);
+        observer.remove<WindowCharEvent>(other.m_WindowCharCallbackIndex);
+        observer.remove<WindowMouseButtonEvent>(other.m_WindowMouseButtonCallbackIndex);
+        observer.remove<WindowMouseScrollEvent>(other.m_WindowMouseScrollCallbackIndex);
+        m_WindowCloseCallbackIndex = observer.addCallback<WindowCloseEvent>(&Window::closeCallback, this);
+        m_WindowResizeCallbackIndex = observer.addCallback<WindowResizeEvent>(&Window::resizeCallback, this);
+        m_WindowMoveCallbackIndex = observer.addCallback<WindowMoveEvent>(&Window::moveCallback, this);
+        m_WindowContentScaleCallbackIndex = observer.addCallback<WindowContentScaleEvent>(&Window::contentScaleCallback, this);
+        m_WindowMouseMoveCallbackIndex = observer.addCallback<WindowMouseMoveEvent>(&Window::mouseMoveCallback, this);
+        m_WindowMaximizeCallbackIndex = observer.addCallback<WindowMaximizeEvent>(&Window::maximizeCallback, this);
+        m_WindowMinimizeCallbackIndex = observer.addCallback<WindowMinimizeEvent>(&Window::minimizeCallback, this);
+        m_WindowGainFocusCallbackIndex = observer.addCallback<WindowGainFocusEvent>(&Window::gainFocusCallback, this);
+        m_WindowLoseFocusCallbackIndex = observer.addCallback<WindowLoseFocusEvent>(&Window::loseFocusCallback, this);
+        m_WindowKeyCallbackIndex = observer.addCallback<WindowKeyEvent>(&Window::keyCallback, this);
+        m_WindowCharCallbackIndex = observer.addCallback<WindowCharEvent>(&Window::charCallback, this);
+        m_WindowMouseButtonCallbackIndex = observer.addCallback<WindowMouseButtonEvent>(&Window::mouseButtonCallback, this);
+        m_WindowMouseScrollCallbackIndex = observer.addCallback<WindowMouseScrollEvent>(&Window::mouseScrollCallback, this);
+#endif
+        }
+
+        return *this;
+    }
+
+    Window Window::New(const Settings &settings) {
+        return Window{settings};
     }
 
     void Window::setTitle(const std::string &title) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetWindowTitle(m_Window, title.c_str());
     }
 
     void Window::setSize(std::uint32_t width, std::uint32_t height) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetWindowSize(m_Window, width, height);
     }
 
     void Window::setWidth(std::uint32_t width) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t height;
         glfwGetWindowSize(m_Window, nullptr, &height);
         glfwSetWindowSize(m_Window, width, height);
     }
 
     void Window::setHeight(std::uint32_t height) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t width;
         glfwGetWindowSize(m_Window, &width, nullptr);
         glfwSetWindowSize(m_Window, width, height);
     }
 
     void Window::setPosition(std::uint32_t x, std::uint32_t y) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetWindowPos(m_Window, x, y);
     }
 
     void Window::setX(std::uint32_t x) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t y;
         glfwGetWindowPos(m_Window, nullptr, &y);
         glfwSetWindowPos(m_Window, x, y);
     }
 
     void Window::setY(std::uint32_t y) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t x;
         glfwGetWindowPos(m_Window, &x, nullptr);
         glfwSetWindowPos(m_Window, x, y);
     }
 
     void Window::setMousePosition(double x, double y) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetCursorPos(m_Window, x, y);
     }
 
     void Window::setMouseX(double x) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         double y;
         glfwGetCursorPos(m_Window, nullptr, &y);
         glfwSetCursorPos(m_Window, x, y);
     }
 
     void Window::setMouseY(double y) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         double x;
         glfwGetCursorPos(m_Window, &x, nullptr);
         glfwSetCursorPos(m_Window, x, y);
     }
 
     void Window::setCursorMode(CursorMode mode) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetInputMode(m_Window, GLFW_CURSOR, static_cast<std::int32_t>(mode));
     }
 
     void Window::setResizable(bool resizable) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetWindowAttrib(m_Window, GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
     }
 
     void Window::setRunning(bool running) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetWindowShouldClose(m_Window, running ? GLFW_FALSE : GLFW_TRUE);
     }
 
     void Window::makeFullscreen(bool monitorSize) {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         auto [width, height] = getSize();
         auto [x, y] = getPosition();
         m_PrevWidth = width;
@@ -183,140 +331,170 @@ namespace Yulduz {
     }
 
     void Window::makeWindowed() {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetWindowMonitor(m_Window, nullptr, m_PrevX, m_PrevY, m_PrevWidth, m_PrevHeight, 0);
     }
 
     void Window::maximize() {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwMaximizeWindow(m_Window);
     }
 
     void Window::minimize() {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwIconifyWindow(m_Window);
     }
 
     void Window::restore() {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwRestoreWindow(m_Window);
     }
 
     void Window::close() {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         glfwSetWindowShouldClose(m_Window, GLFW_TRUE);
     }
 
     GLFWwindow *Window::get() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return m_Window;
     }
 
     std::string Window::getTitle() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwGetWindowTitle(m_Window);
     }
 
     std::array<std::uint32_t, 2> Window::getSize() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t width, height;
         glfwGetWindowSize(m_Window, &width, &height);
         return {static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)};
     }
 
     std::uint32_t Window::getWidth() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t height;
         glfwGetWindowSize(m_Window, nullptr, &height);
         return height;
     }
 
     std::uint32_t Window::getHeight() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t width;
         glfwGetWindowSize(m_Window, &width, nullptr);
         return width;
     }
 
     std::array<std::uint32_t, 2> Window::getPosition() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t x, y;
         glfwGetWindowPos(m_Window, &x, &y);
         return {static_cast<std::uint32_t>(x), static_cast<std::uint32_t>(y)};
     }
 
     std::uint32_t Window::getX() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t y;
         glfwGetWindowPos(m_Window, nullptr, &y);
         return y;
     }
 
     std::uint32_t Window::getY() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         std::int32_t x;
         glfwGetWindowPos(m_Window, &x, nullptr);
         return x;
     }
 
     std::array<double, 2> Window::getMousePosition() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         double x, y;
         glfwGetCursorPos(m_Window, &x, &y);
         return {x, y};
     }
 
     double Window::getMouseX() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         double y;
         glfwGetCursorPos(m_Window, nullptr, &y);
         return y;
     }
 
     double Window::getMouseY() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         double x;
         glfwGetCursorPos(m_Window, &x, nullptr);
         return x;
     }
 
     CursorMode Window::getCursorMode() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return static_cast<CursorMode>(glfwGetInputMode(m_Window, GLFW_CURSOR));
     }
 
     bool Window::isClosed() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwWindowShouldClose(m_Window) == GLFW_TRUE;
     }
 
     bool Window::isRunning() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwWindowShouldClose(m_Window) == GLFW_FALSE;
     }
 
     bool Window::isMaximized() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwGetWindowAttrib(m_Window, GLFW_MAXIMIZED) == GLFW_TRUE;
     }
 
     bool Window::isMinimized() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwGetWindowAttrib(m_Window, GLFW_ICONIFIED) == GLFW_TRUE;
     }
 
     bool Window::isFocused() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwGetWindowAttrib(m_Window, GLFW_FOCUSED) == GLFW_TRUE;
     }
 
     bool Window::isFullscreen() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwGetWindowMonitor(m_Window) != nullptr;
     }
 
     bool Window::isResizable() const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwGetWindowAttrib(m_Window, GLFW_RESIZABLE) == GLFW_TRUE;
     }
 
     bool Window::isKeyModPressed(KeyMod mod) const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return static_cast<std::int32_t>(m_KeyMods & mod) > 0;
     }
 
     bool Window::isKeyDown(KeyCode key) const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return m_Keys[static_cast<std::size_t>(key)];
     }
 
     bool Window::isKeyUp(KeyCode key) const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return !m_Keys[static_cast<std::size_t>(key)];
     }
 
     bool Window::isMouseButtonDown(MouseButton button) const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return m_MouseButtons[static_cast<std::size_t>(button)];
     }
 
     bool Window::isMouseButtonUp(MouseButton button) const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return !m_MouseButtons[static_cast<std::size_t>(button)];
     }
 
     WGPUSurface Window::getWGPUSurface(WGPUInstance instance) const {
+        assert(m_Window != nullptr && "GLFWwindow cannot be nullptr");
         return glfwGetWGPUSurface(m_Window, instance);
     }
 

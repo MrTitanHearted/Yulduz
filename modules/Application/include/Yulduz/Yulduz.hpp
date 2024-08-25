@@ -10,6 +10,11 @@ namespace Yulduz {
         static void Run();
 
        private:
+        std::size_t m_WindowResizeCallbackIndex;
+        std::size_t m_WindowKeyCallbackIndex;
+        std::size_t m_WindowMouseMoveCallbackIndex;
+        std::size_t m_WindowMouseScrollCallbackIndex;
+
         Window m_Window;
         GraphicsContext m_Context;
 

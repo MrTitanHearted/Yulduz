@@ -23,7 +23,7 @@ namespace Yulduz {
                                               });
 
     void App::Run() {
-        Window::SetEventObserver(EventObserver::GetDefault());
+        //Logger::SetLogLevel(LogLevel::Info);
         App app{};
 
         try {
@@ -37,12 +37,12 @@ namespace Yulduz {
         }
     }
 
-    App::App()
-        : m_Window{Window::Settings{
-              .Width = 1200,
-              .Height = 800,
-          }} {
+    App::App() {
         YZDEBUG("Initializing Yulduz Application");
+        m_Window = Window::New(Window::Settings{
+            .Width = 1200,
+            .Height = 1000,
+        });
         m_Context = GraphicsContextBuilder::New()
                         .setBackend(InstanceBackend::Vulkan)
                         // .setBackend(InstanceBackend::DX12)
@@ -50,10 +50,10 @@ namespace Yulduz {
                         .addSurfaceUsage(TextureUsage::CopyDst)
                         .build(m_Window);
         auto &observer = EventObserver::GetDefault();
-        observer.addCallback<WindowResizeEvent>(&App::resizeCallback, this);
-        observer.addCallback<WindowKeyEvent>(&App::keyCallback, this);
-        observer.addCallback<WindowMouseMoveEvent>(&App::mouseMoveCallback, this);
-        observer.addCallback<WindowMouseScrollEvent>(&App::mouseScrollCallback, this);
+        m_WindowResizeCallbackIndex = observer.addCallback<WindowResizeEvent>(&App::resizeCallback, this);
+        m_WindowKeyCallbackIndex = observer.addCallback<WindowKeyEvent>(&App::keyCallback, this);
+        m_WindowMouseMoveCallbackIndex = observer.addCallback<WindowMouseMoveEvent>(&App::mouseMoveCallback, this);
+        m_WindowMouseScrollCallbackIndex = observer.addCallback<WindowMouseScrollEvent>(&App::mouseScrollCallback, this);
 
         InitImGui(ImGuiSettings{
             .DepthFormat = TextureFormat::Undefined,
@@ -139,6 +139,12 @@ namespace Yulduz {
     App::~App() {
         YZDEBUG("Releasing Yulduz Application");
         ShutdownImGui();
+
+        EventObserver &observer = EventObserver::GetDefault();
+        observer.remove<WindowResizeEvent>(m_WindowResizeCallbackIndex);
+        observer.remove<WindowKeyEvent>(m_WindowKeyCallbackIndex);
+        observer.remove<WindowMouseMoveEvent>(m_WindowMouseMoveCallbackIndex);
+        observer.remove<WindowMouseScrollEvent>(m_WindowMouseScrollCallbackIndex);
     }
 
     void App::run() {
@@ -208,7 +214,7 @@ namespace Yulduz {
 
         ImGui::Begin("Settings");
         ImGui::Text("Camera Multiplier when pressed Shift key:");
-        ImGui::SameLine();
+        //ImGui::SameLine();
         ImGui::DragFloat("##DragFloat", &m_CameraMultiplier, 0.1f, 1.0f, 100.0f);
         ImGui::End();
 

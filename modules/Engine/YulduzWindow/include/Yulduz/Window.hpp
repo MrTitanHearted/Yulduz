@@ -17,18 +17,21 @@ namespace Yulduz {
         };
 
        public:
-        static void SetEventObserver(EventObserver &observer);
         static void PollEvents();
 
        public:
         Window(const Settings &settings);
-        ~Window();
 
-        Window(Window &&) = delete;
-        Window &operator=(Window &&) = delete;
+        Window();
+        ~Window();
 
         Window(const Window &) = delete;
         Window &operator=(const Window &) = delete;
+
+        Window(Window &&other);
+        Window &operator=(Window &&other);
+
+        static Window New(const Settings &settings);
 
         void setTitle(const std::string &title);
         void setSize(std::uint32_t width, std::uint32_t height);
@@ -78,6 +81,7 @@ namespace Yulduz {
         bool isMouseButtonUp(MouseButton button) const;
 
         WGPUSurface getWGPUSurface(WGPUInstance instance) const;
+
        private:
         class GlfwState {
            public:
@@ -93,11 +97,26 @@ namespace Yulduz {
         std::uint32_t m_PrevY;
 
         KeyMod m_KeyMods;
-        bool m_Keys[GLFW_KEY_LAST + 1];
-        bool m_MouseButtons[GLFW_MOUSE_BUTTON_LAST + 1];
+        std::array<bool, GLFW_KEY_LAST + 1> m_Keys;
+        std::array<bool, GLFW_MOUSE_BUTTON_LAST + 1> m_MouseButtons;
+
+#if defined(YULDUZ_BUILD_TYPE_DEBUG)
+        std::size_t m_WindowCloseCallbackIndex;
+        std::size_t m_WindowResizeCallbackIndex;
+        std::size_t m_WindowMoveCallbackIndex;
+        std::size_t m_WindowContentScaleCallbackIndex;
+        std::size_t m_WindowMouseMoveCallbackIndex;
+        std::size_t m_WindowMaximizeCallbackIndex;
+        std::size_t m_WindowMinimizeCallbackIndex;
+        std::size_t m_WindowGainFocusCallbackIndex;
+        std::size_t m_WindowLoseFocusCallbackIndex;
+        std::size_t m_WindowKeyCallbackIndex;
+        std::size_t m_WindowCharCallbackIndex;
+        std::size_t m_WindowMouseButtonCallbackIndex;
+        std::size_t m_WindowMouseScrollCallbackIndex;
+#endif
 
         static GlfwState g_GlfwState;
-        static EventObserver *g_EventObserver;
 
        private:
 #if defined(YULDUZ_BUILD_TYPE_DEBUG)
