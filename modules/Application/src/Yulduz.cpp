@@ -23,7 +23,7 @@ namespace Yulduz {
                                               });
 
     void App::Run() {
-        //Logger::SetLogLevel(LogLevel::Info);
+        // Logger::SetLogLevel(LogLevel::Info);
         App app{};
 
         try {
@@ -45,7 +45,7 @@ namespace Yulduz {
         });
         m_Context = GraphicsContextBuilder::New()
                         .setBackend(InstanceBackend::Vulkan)
-                        // .setBackend(InstanceBackend::DX12)
+                         .setBackend(InstanceBackend::DX12)
                         .setPreferredSurfaceFormat(TextureFormat::BGRA8Unorm)
                         .addSurfaceUsage(TextureUsage::CopyDst)
                         .build(m_Window);
@@ -161,6 +161,11 @@ namespace Yulduz {
 
             m_Context.renderFrame(&App::renderFrame, this);
 
+            if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+                ImGui::UpdatePlatformWindows();
+                ImGui::RenderPlatformWindowsDefault();
+            }
+
             timer.stop();
             m_DeltaTime = timer.getElapsed();
             m_Time += m_DeltaTime;
@@ -214,7 +219,7 @@ namespace Yulduz {
 
         ImGui::Begin("Settings");
         ImGui::Text("Camera Multiplier when pressed Shift key:");
-        //ImGui::SameLine();
+        // ImGui::SameLine();
         ImGui::DragFloat("##DragFloat", &m_CameraMultiplier, 0.1f, 1.0f, 100.0f);
         ImGui::End();
 
@@ -300,7 +305,9 @@ namespace Yulduz {
     }
 
     void App::resizeCallback(const WindowResizeEvent &event) {
+        //ImGui_ImplWGPU_InvalidateDeviceObjects();
         m_Context.resize(event.width, event.height);
+        //ImGui_ImplWGPU_CreateDeviceObjects();
     }
 
     void App::mouseMoveCallback(const WindowMouseMoveEvent &event) {

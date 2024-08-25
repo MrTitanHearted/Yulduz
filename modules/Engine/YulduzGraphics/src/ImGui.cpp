@@ -18,13 +18,16 @@ namespace Yulduz {
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
         ImGui::StyleColorsDark();
 
         ImGui_ImplWGPU_InitInfo initInfo{};
+        initInfo.Instance = settings.Context.get().getInstance();
         initInfo.Device = settings.Context.get().getDevice();
         initInfo.RenderTargetFormat = settings.Context.get().getConfig().format;
         initInfo.DepthStencilFormat = static_cast<WGPUTextureFormat>(settings.DepthFormat);
+        initInfo.ViewportPresentMode = static_cast<WGPUPresentMode>(settings.Context.get().getPresentMode());
 
         const Window &window = settings.Context.get().getWindow();
         ImGui_ImplGlfw_InitForOther(window.get(), true);
