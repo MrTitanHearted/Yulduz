@@ -16,8 +16,16 @@ namespace Yulduz {
             return false;
         });
         attachCallback<SDL_MouseMotionEvent>([this](const SDL_MouseMotionEvent &event) -> bool {
-            if (m_Play)
-                m_Camera.processMouseMovement(event.xrel, -event.yrel);
+            if (!m_Play) return false;
+
+            m_Camera.processMouseMovement(event.xrel, -event.yrel);
+
+            return false;
+        });
+        attachCallback<SDL_MouseWheelEvent>([this](const SDL_MouseWheelEvent &event) -> bool {
+            if (!m_Play) return false;
+
+            m_Camera.processMouseScroll(static_cast<glm::f32>(event.integer_y));
 
             return false;
         });
@@ -138,8 +146,9 @@ namespace Yulduz {
 
     void EditorLayer::initializeImGUI() const {
         attachCallback<SDL_Event>([this](const SDL_Event &event) -> bool {
-            if (!m_Play)
-                ImGui_ImplSDL3_ProcessEvent(&event);
+            if (m_Play) return false;
+
+            ImGui_ImplSDL3_ProcessEvent(&event);
 
             return false;
         });
