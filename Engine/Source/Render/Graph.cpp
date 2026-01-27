@@ -169,8 +169,8 @@ namespace Yulduz {
             }
 
             // Add edges from dependencies to current pass
-            for (const auto dep : dependencies) {
-                adjacency_list[dep].push_back(i);
+            for (const auto dependency : dependencies) {
+                adjacency_list[dependency].push_back(i);
                 in_degree[i]++;
             }
         }

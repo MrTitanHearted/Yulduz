@@ -1,4 +1,6 @@
-void* operator new[](const size_t size,
+#include <Yulduz/Common/API.hpp>
+
+YULDUZ_API void* operator new[](const size_t size,
                      const char* /*name*/,
                      int /*flags*/,
                      unsigned /*debugFlags*/,
@@ -7,7 +9,7 @@ void* operator new[](const size_t size,
     return ::operator new[](size);
 }
 
-void* operator new[](const size_t size,
+YULDUZ_API void* operator new[](const size_t size,
                      const size_t alignment,
                      const size_t /*alignmentOffset*/,
                      const char* /*name*/,

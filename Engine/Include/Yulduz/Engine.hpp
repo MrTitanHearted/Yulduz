@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Yulduz/Assets.hpp>
+#include <Yulduz/Camera.hpp>
 #include <Yulduz/Common.hpp>
 #include <Yulduz/Render.hpp>
 #include <Yulduz/Window.hpp>

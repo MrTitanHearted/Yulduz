@@ -4,7 +4,7 @@
 #include <Yulduz/Render.hpp>
 
 namespace Yulduz {
-    class Engine;
+    class YULDUZ_API Engine;
 
     class YULDUZ_API ILayer {
        public:
@@ -17,6 +17,14 @@ namespace Yulduz {
         virtual void onUpdate(glm::f64 delta_time) {}
 
         virtual void onRender(RenderGraph &render_graph) {}
+
+        virtual void onGUI() {}
+
+        virtual void onBeginGUI() {}
+
+        virtual void onEndGUI() {}
+
+        virtual void onRenderGUI(RenderGraph &render_graph) {}
 
         template <typename TEvent>
         void attachCallback(eastl::function<bool(const TEvent &)> callback) const;

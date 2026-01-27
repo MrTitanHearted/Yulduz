@@ -3,7 +3,7 @@
 #include <Yulduz/Common.hpp>
 
 namespace Yulduz {
-    struct TextureAlias {
+    struct YULDUZ_API TextureAlias {
         size_t Hash = 0;
 
         TextureAlias()  = default;
@@ -15,7 +15,7 @@ namespace Yulduz {
         bool operator==(const TextureAlias &handle) const = default;
     };
 
-    struct BufferAlias {
+    struct YULDUZ_API BufferAlias {
         size_t Hash = 0;
 
         BufferAlias()  = default;
@@ -46,7 +46,7 @@ struct YULDUZ_API eastl::hash<Yulduz::BufferAlias> {
 };
 
 namespace Yulduz {
-    class RenderContext {
+    class YULDUZ_API RenderContext {
        public:
         RenderContext()  = default;
         ~RenderContext() = default;
@@ -66,7 +66,7 @@ namespace Yulduz {
         friend class RenderGraph;
     };
 
-    class RenderPass {
+    class YULDUZ_API RenderPass {
        public:
         RenderPass()  = default;
         ~RenderPass() = default;
@@ -95,7 +95,7 @@ namespace Yulduz {
         friend class RenderGraph;
     };
 
-    class RenderGraph {
+    class YULDUZ_API RenderGraph {
        public:
         void setTexture(const TextureAlias &alias, SDL_GPUTexture *texture);
         void setBuffer(const BufferAlias &alias, SDL_GPUBuffer *buffer);

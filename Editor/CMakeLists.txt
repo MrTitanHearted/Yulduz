@@ -63,7 +63,7 @@ foreach (SHADER_FILE ${YULDUZ_EDITOR_SHADERS})
 
     add_custom_command(
         OUTPUT ${SPIRV}
-        COMMAND ${SLANGC_EXECUTABLE} -matrix-layout-column-major -fvk-use-entrypoint-name -emit-spirv-directly -I ${YULDUZ_ASSETS_SOURCE_DIR} ${SHADER_FILE} -target spirv -o ${SPIRV}
+        COMMAND ${SLANGC_EXECUTABLE} -matrix-layout-column-major -fvk-use-entrypoint-name -emit-spirv-directly -I ${YULDUZ_ASSETS_SOURCE_DIR} ${SHADER_FILE} -target spirv -profile spirv_1_0 -o ${SPIRV}
         DEPENDS ${SHADER_FILE}
     )
 

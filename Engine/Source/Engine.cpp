@@ -87,7 +87,19 @@ namespace Yulduz {
                 layer->onUpdate(m_DeltaTime);
 
             for (const auto &layer : std::views::reverse(m_LayerStack))
+                layer->onBeginGUI();
+
+            for (const auto &layer : std::views::reverse(m_LayerStack))
+                layer->onGUI();
+
+            for (const auto &layer : std::views::reverse(m_LayerStack))
+                layer->onEndGUI();
+
+            for (const auto &layer : std::views::reverse(m_LayerStack))
                 layer->onRender(m_RenderGraph);
+
+            for (const auto &layer : std::views::reverse(m_LayerStack))
+                layer->onRenderGUI(m_RenderGraph);
 
             SDL_GPUCommandBuffer *command_buffer    = nullptr;
             SDL_GPUTexture       *swapchain_texture = nullptr;
