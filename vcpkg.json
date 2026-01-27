@@ -1,0 +1,11 @@
+{
+    "name": "yulduz",
+    "version": "0.0.1",
+    "dependencies": [
+        "eastl",
+        "glm",
+        "spdlog",
+        "mikktspace",
+        "assimp"
+    ]
+}

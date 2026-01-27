@@ -1,0 +1,10 @@
+[submodule "Vendor/SDL"]
+	path = Vendor/SDL
+	url = git@github.com:libsdl-org/SDL.git
+[submodule "Vendor/stb"]
+	path = Vendor/stb
+	url = git@github.com:nothings/stb.git
+[submodule "Vendor/imgui"]
+	path = Vendor/imgui
+	url = git@github.com:ocornut/imgui.git
+	branch = docking
