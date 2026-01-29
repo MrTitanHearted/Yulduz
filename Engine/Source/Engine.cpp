@@ -33,10 +33,10 @@ namespace Yulduz {
 
         m_IsRunning = false;
 
-        m_Window.initialize(settings.WindowSettings);
-        m_Render.initialize(settings.RenderSettings, m_Window.getHandle());
-
         m_RenderGraph.setSwapchainTextureAlias(settings.SwapchainTextureAlias);
+
+        m_Window.initialize(settings.WindowSettings);
+        m_Render.initialize(settings.RenderSettings, m_Window.getHandle(), m_RenderGraph);
 
         s_pInstance = this;
 

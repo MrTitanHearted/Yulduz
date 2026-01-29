@@ -5,12 +5,18 @@ namespace Yulduz {
         attachCallback<SDL_KeyboardEvent>([this](const SDL_KeyboardEvent &event) {
             if (!event.down) return false;
 
-            if (SDLK_P == event.key) {
+            if (!m_Play && SDLK_RETURN == event.key) {
                 m_Play = true;
                 SDL_SetWindowRelativeMouseMode(Window::GetHandle(), true);
-            } else if (SDLK_L == event.key) {
+            } else if (m_Play && SDLK_ESCAPE == event.key) {
                 m_Play = false;
                 SDL_SetWindowRelativeMouseMode(Window::GetHandle(), false);
+            } else if (!m_Play && SDLK_F == event.key) {
+                if (SDL_GetWindowFlags(Window::GetHandle()) & SDL_WINDOW_FULLSCREEN > 0) {
+                    SDL_SetWindowFullscreen(Window::GetHandle(), false);
+                } else {
+                    SDL_SetWindowFullscreen(Window::GetHandle(), true);
+                }
             }
 
             return false;
@@ -62,24 +68,43 @@ namespace Yulduz {
     }
 
     void EditorLayer::onRender(RenderGraph &render_graph) {
+        {
+            const auto info   = Render::GetViewportInfo({"Yulduz::EditorLayer::MainViewport"});
+            const auto width  = static_cast<glm::f32>(info.Width);
+            const auto height = static_cast<glm::f32>(info.Height);
+
+            Render::SetViewportCamera(
+                {"Yulduz::EditorLayer::MainViewport"},
+                {
+                    m_Camera.getProjection(width / height),
+                    m_Camera.getView(),
+                    m_Camera.getPosition(),
+                });
+        }
+
         RenderPass pass{};
 
         pass
-            .writeTexture(TextureAlias("Yulduz::SwapchainTexture"))
+            .writeTexture(m_ViewportTextureAlias)
             .setExecuteFn([this](const RenderContext &context) {
                 SDL_GPUCommandBuffer *command_buffer = context.getCommandBuffer();
 
                 SDL_GPUColorTargetInfo color_target_info{};
-                color_target_info.texture     = context.getTexture(TextureAlias("Yulduz::SwapchainTexture"));
+                color_target_info.texture     = context.getTexture(m_ViewportTextureAlias);
                 color_target_info.clear_color = SDL_FColor{0.2f, 0.3f, 0.3f, 1.0f};
                 color_target_info.load_op     = SDL_GPU_LOADOP_CLEAR;
                 color_target_info.store_op    = SDL_GPU_STOREOP_STORE;
 
                 SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &color_target_info, 1, nullptr);
 
-                glm::i32 width;
-                glm::i32 height;
-                SDL_GetWindowSize(Window::GetHandle(), &width, &height);
+                glm::u32 width;
+                glm::u32 height;
+                {
+                    const auto info = Render::GetViewportInfo(m_Viewport);
+
+                    width  = info.Width;
+                    height = info.Height;
+                }
 
                 SDL_GPUViewport viewport{};
                 viewport.x = 0.0f;
@@ -107,7 +132,23 @@ namespace Yulduz {
     }
 
     void EditorLayer::onGUI() {
-        ImGui::ShowDemoWindow();
+        ImGui::ShowMetricsWindow();
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::Begin("Yulduz::EditorLayer::Viewport");
+        ImGui::PopStyleVar(2);
+
+        const ImVec2 viewport_size = ImGui::GetContentRegionAvail();
+
+        if (const auto info = Render::GetViewportInfo(m_Viewport);
+            static_cast<glm::u32>(viewport_size.x) != info.Width ||
+            static_cast<glm::u32>(viewport_size.y) != info.Height) {
+            Render::ResizeViewport(m_Viewport, static_cast<glm::u32>(viewport_size.x), static_cast<glm::u32>(viewport_size.y));
+        }
+        ImGui::Image(Render::GetViewportTexture(m_Viewport), viewport_size);
+
+        ImGui::End();
     }
 
     void EditorLayer::onBeginGUI() {
@@ -181,6 +222,16 @@ namespace Yulduz {
     }
 
     void EditorLayer::initializePipeline() {
+        m_Viewport = Render::AddViewport(
+            "Yulduz::EditorLayer::MainViewport",
+            {
+                .Usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+
+                .Width  = 1,
+                .Height = 1,
+            });
+        m_ViewportTextureAlias = TextureAlias("Yulduz::EditorLayer::MainViewport");
+
         struct Vertex {
             glm::vec3 Position;
             glm::vec3 Color;
@@ -211,8 +262,10 @@ namespace Yulduz {
         SDL_GPUShader *vs = SDL_CreateGPUShader(device, &vs_create_info);
         SDL_GPUShader *fs = SDL_CreateGPUShader(device, &fs_create_info);
 
+        const auto viewport_info = Render::GetViewportInfo(Render::Viewport{"Yulduz::EditorLayer::MainViewport"});
+
         SDL_GPUColorTargetDescription color_target_description{};
-        color_target_description.format = SDL_GetGPUSwapchainTextureFormat(device, Window::GetHandle());
+        color_target_description.format = viewport_info.Format;
         color_target_description
             .blend_state
             .enable_blend = false;
@@ -222,7 +275,7 @@ namespace Yulduz {
         vertex_buffer_description.pitch      = sizeof(Vertex);
         vertex_buffer_description.slot       = 0;
 
-        eastl::vector<SDL_GPUVertexAttribute> vertex_attributes{
+        eastl::vector vertex_attributes{
             SDL_GPUVertexAttribute{0, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, offsetof(Vertex, Position)},
             SDL_GPUVertexAttribute{1, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3, offsetof(Vertex, Color)},
         };
@@ -288,9 +341,9 @@ namespace Yulduz {
             void *mapped_dst = SDL_MapGPUTransferBuffer(device, transfer_buffer, false);
 
             size_t offset = 0;
-            SDL_memcpy(mapped_dst + offset, vertices.data(), vertex_buffer_create_info.size);
+            SDL_memcpy(static_cast<char *>(mapped_dst) + offset, vertices.data(), vertex_buffer_create_info.size);
             offset += vertex_buffer_create_info.size;
-            SDL_memcpy(mapped_dst + offset, indices.data(), index_buffer_create_info.size);
+            SDL_memcpy(static_cast<char *>(mapped_dst) + offset, indices.data(), index_buffer_create_info.size);
             offset += index_buffer_create_info.size;
 
             SDL_UnmapGPUTransferBuffer(device, transfer_buffer);
@@ -301,26 +354,26 @@ namespace Yulduz {
 
             SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
-            SDL_GPUTransferBufferLocation vs_source{};
-            vs_source.transfer_buffer = transfer_buffer;
-            vs_source.offset          = 0;
+            SDL_GPUTransferBufferLocation v_source{};
+            v_source.transfer_buffer = transfer_buffer;
+            v_source.offset          = 0;
 
-            SDL_GPUBufferRegion vs_destination{};
-            vs_destination.buffer = m_VertexBuffer;
-            vs_destination.size   = vertex_buffer_create_info.size;
-            vs_destination.offset = 0;
+            SDL_GPUBufferRegion v_destination{};
+            v_destination.buffer = m_VertexBuffer;
+            v_destination.size   = vertex_buffer_create_info.size;
+            v_destination.offset = 0;
 
-            SDL_GPUTransferBufferLocation fs_source{};
-            fs_source.transfer_buffer = transfer_buffer;
-            fs_source.offset          = vertex_buffer_create_info.size;
+            SDL_GPUTransferBufferLocation i_source{};
+            i_source.transfer_buffer = transfer_buffer;
+            i_source.offset          = vertex_buffer_create_info.size;
 
-            SDL_GPUBufferRegion fs_destination{};
-            fs_destination.buffer = m_IndexBuffer;
-            fs_destination.size   = index_buffer_create_info.size;
-            fs_destination.offset = 0;
+            SDL_GPUBufferRegion i_destination{};
+            i_destination.buffer = m_IndexBuffer;
+            i_destination.size   = index_buffer_create_info.size;
+            i_destination.offset = 0;
 
-            SDL_UploadToGPUBuffer(copy_pass, &vs_source, &vs_destination, false);
-            SDL_UploadToGPUBuffer(copy_pass, &fs_source, &fs_destination, false);
+            SDL_UploadToGPUBuffer(copy_pass, &v_source, &v_destination, false);
+            SDL_UploadToGPUBuffer(copy_pass, &i_source, &i_destination, false);
 
             SDL_EndGPUCopyPass(copy_pass);
 
@@ -344,5 +397,7 @@ namespace Yulduz {
         SDL_ReleaseGPUBuffer(device, m_VertexBuffer);
 
         SDL_ReleaseGPUGraphicsPipeline(device, m_Pipeline);
+
+        Render::RemoveViewport(m_Viewport);
     }
 }  // namespace Yulduz

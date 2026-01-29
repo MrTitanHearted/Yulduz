@@ -3,7 +3,7 @@
 #include <Yulduz/Common.hpp>
 
 namespace Yulduz {
-    class Camera {
+    class YULDUZ_API Camera {
        public:
         static constexpr float k_Yaw         = -90.0f;
         static constexpr float k_Pitch       = 0.0f;

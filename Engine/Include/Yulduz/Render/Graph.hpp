@@ -9,6 +9,9 @@ namespace Yulduz {
         TextureAlias()  = default;
         ~TextureAlias() = default;
 
+        TextureAlias(const size_t hash)
+            : Hash{hash} {}
+
         TextureAlias(const eastl::string_view name)
             : Hash{eastl::hash<eastl::string_view>{}(name)} {}
 
@@ -20,6 +23,9 @@ namespace Yulduz {
 
         BufferAlias()  = default;
         ~BufferAlias() = default;
+
+        BufferAlias(const size_t hash)
+            : Hash{hash} {}
 
         BufferAlias(const eastl::string_view name)
             : Hash{eastl::hash<eastl::string_view>{}(name)} {}

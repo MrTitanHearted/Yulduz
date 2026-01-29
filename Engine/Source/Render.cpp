@@ -15,7 +15,7 @@ namespace Yulduz {
         return s_pInstance->m_Device;
     }
 
-    void Render::initialize(const Settings &settings, SDL_Window *window) {
+    void Render::initialize(const Settings &settings, SDL_Window *window, RenderGraph &render_graph) {
         DYULDUZ_ASSERT(nullptr == s_pInstance, "Yulduz::Render is already initialized");
 
         m_Window = window;
@@ -89,6 +89,8 @@ namespace Yulduz {
 
         SDL_SetGPUAllowedFramesInFlight(m_Device, settings.MaxFramesInFlight);
 
+        m_pRenderGraph = &render_graph;
+
         s_pInstance = this;
 
         DYULDUZ_LOG_ENGINE_INFO("Yulduz::Render initialized");
@@ -96,6 +98,12 @@ namespace Yulduz {
 
     void Render::release() {
         DYULDUZ_ASSERT(nullptr != s_pInstance, "Yulduz::Render is not initialized");
+
+        for (const auto &[_, viewport] : m_Viewports) {
+            SDL_ReleaseGPUTexture(m_Device, viewport.Target);
+        }
+
+        m_Viewports.clear();
 
         SDL_ReleaseWindowFromGPUDevice(m_Device, m_Window);
         SDL_DestroyGPUDevice(m_Device);

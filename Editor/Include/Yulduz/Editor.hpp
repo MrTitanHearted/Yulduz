@@ -31,6 +31,10 @@ namespace Yulduz {
 
         Camera m_Camera{};
 
+        Render::Viewport m_Viewport = Render::k_InvalidViewport;
+
+        TextureAlias m_ViewportTextureAlias = k_InvalidTextureAlias;
+
         SDL_GPUGraphicsPipeline *m_Pipeline = nullptr;
 
         SDL_GPUBuffer *m_VertexBuffer = nullptr;
