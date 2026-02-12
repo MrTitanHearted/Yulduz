@@ -1,0 +1,54 @@
+YULDUZ_InitializeEngine(engine);
+
+YULDUZ_AddModule(engine, physics_module);
+YULDUZ_AddModule(engine, render_module);
+YULDUZ_AddModule(engine, script_module);
+
+YULDUZ_RunEngine(engine);
+
+YULDUZ_ReleaseEngine(engine);
+
+void on_physics_startup(YULDUZ_CommandBuffer *command_buffer) {
+    YULDUZ_Entity entity = YULDUZ_SpawnEntity(command_buffer);
+    YULDUZ_AddComponent(command_buffer, entity, "Velocity", nullptr);
+    YULDUZ_AddComponent(command_buffer, entity, "Position", &initial_position);
+}
+
+void on_physics_update_velocity(YULDUZ_CommandBuffer *command_buffer, YULDUZ_Entity entity, void **data);
+void on_physics_update_position(YULDUZ_CommandBuffer *command_buffer, YULDUZ_Entity entity, void **data);
+
+void on_physic_update(YULDUZ_CommandBuffer *command_buffer) {
+    double dt = YULDUZ_GetDeltaTime();
+    YULDUZ_Query query = {0};
+
+    YULDUZ_BeginQuery(command_buffer, &query);
+    YULDUZ_QueryWithoutComponent(&query, "Acceleration");
+    YULDUZ_QueryWithComponent(&query, "Velocity", YULDUZ_AccessType_Write);
+    YULDUZ_EndQuery(command_buffer, &query, &on_physics_update_velocity);
+
+    YULDUZ_BeginQuery(command_buffer, &query);
+    YULDUZ_QueryWithComponent(&query, "Velocity", YULDUZ_AccessType_Read);
+    YULDUZ_QueryWithResource(&query, "DeltaTime", YULDUZ_AccessType_Read);
+    YULDUZ_QueryWithComponent(&query, "Position", YULDUZ_AccessType_Write);
+    YULDUZ_EndQuery(command_buffer, &query, &on_physics_update_position);
+}
+
+void on_physics_update_velocity(YULDUZ_CommandBuffer *command_buffer, YULDUZ_Entity entity, void **data) {
+    vec3 *velocity = data[0];
+    ...
+}
+
+void on_physics_update_position(YULDUZ_CommandBuffer *command_buffer, YULDUZ_Entity entity, void **data) {
+    vec3 *velocity = data[0];
+    vec3 *position = data[2];
+
+    double *dt = data[1];
+
+    vec3 normalized_velocity = vec3_mul_s(*velocity, *dt);
+
+    *position = vec3_add(*position, normalized_velocity);
+
+    if (position->y < min_y) {
+        YULDUZ_DestroyEntity(command_buffer, entity);
+    }
+}
