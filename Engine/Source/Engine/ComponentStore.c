@@ -1,7 +1,7 @@
 #include <Yulduz/Engine/ComponentStore.h>
 
 bool YULDUZ_InitializeComponentStore(
-    YULDUZ_ComponentStore *store, YULDUZ_ComponentTypeDescription type_description, uint32_t initial_capacity) {
+    YULDUZ_ComponentStore *store, YULDUZ_TypeInfo type_description, uint32_t initial_capacity) {
     SDL_zerop(store);
 
     store->Type          = type_description.Type;

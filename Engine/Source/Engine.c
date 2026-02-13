@@ -16,7 +16,7 @@ bool YULDUZ_InitializeEngine(YULDUZ_Engine *engine, YULDUZ_NULLABLE const YULDUZ
     // if (!YULDUZ_InitializeEntityRegistry(&engine->EntityRegistry, initial_entities_capacity)) {
         // return false;
     // }
-    // if (!YULDUZ_InitializeComponentTypeRegistry(&engine->ComponentTypeRegistry, initial_component_types_capacity)) {
+    // if (!YULDUZ_InitializeTypeRegistry(&engine->ComponentTypeRegistry, initial_component_types_capacity)) {
         // return false;
     // }
 
@@ -28,7 +28,7 @@ bool YULDUZ_InitializeEngine(YULDUZ_Engine *engine, YULDUZ_NULLABLE const YULDUZ
 }
 
 void YULDUZ_ReleaseEngine(YULDUZ_Engine *engine) {
-    // YULDUZ_ReleaseComponentTypeRegistry(&engine->ComponentTypeRegistry);
+    // YULDUZ_ReleaseTypeRegistry(&engine->ComponentTypeRegistry);
     // YULDUZ_ReleaseEntityRegistry(&engine->EntityRegistry);
 
     SDL_zerop(engine);

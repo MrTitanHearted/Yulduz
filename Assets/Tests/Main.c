@@ -1,5 +1,4 @@
 #include <Yulduz/Engine.h>
-#include <time.h>
 
 // Test component types
 typedef struct Position {

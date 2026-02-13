@@ -3,10 +3,12 @@
 #include <Yulduz/Common.h>
 
 #include <Yulduz/Engine/Archetype.h>
+#include <Yulduz/Engine/Command.h>
 #include <Yulduz/Engine/ComponentStore.h>
-#include <Yulduz/Engine/ComponentType.h>
+#include <Yulduz/Engine/ECS.h>
 #include <Yulduz/Engine/Entity.h>
 #include <Yulduz/Engine/EntityRegistry.h>
+#include <Yulduz/Engine/Type.h>
 
 typedef struct YULDUZ_Engine               YULDUZ_Engine;
 typedef struct YULDUZ_EngineInitializeInfo YULDUZ_EngineInitializeInfo;
@@ -14,7 +16,7 @@ typedef struct YULDUZ_EngineInitializeInfo YULDUZ_EngineInitializeInfo;
 struct YULDUZ_Engine {
     // YULDUZ_EntityRegistry EntityRegistry;
 
-    // YULDUZ_ComponentTypeRegistry ComponentTypeRegistry;
+    // YULDUZ_TypeRegistry ComponentTypeRegistry;
 
     SDL_AtomicU32 IsRunning;
 };
