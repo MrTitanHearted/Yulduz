@@ -103,6 +103,39 @@ void benchmark_ecs_set_component(void);
 void benchmark_ecs_full_workflow(void);
 void benchmark_ecs_archetype_lookup(void);
 
+// Query Tests
+void test_query_initialization(void);
+void test_query_component_types(void);
+void test_query_tag_types(void);
+void test_query_mixed_requirements(void);
+void test_query_deep_copy(void);
+void test_query_access_types(void);
+void test_query_sorting(void);
+void test_query_capacity_growth(void);
+void test_query_edge_cases(void);
+void stress_query_many_requirements(void);
+void stress_query_copy_operations(void);
+void benchmark_query_creation(void);
+void benchmark_query_copy(void);
+void benchmark_query_modification(void);
+
+// System Tests
+void test_system_initialization(void);
+void test_system_basic_execution(void);
+void test_system_query_matching(void);
+void test_system_read_write_access(void);
+void test_system_with_tags(void);
+void test_system_multiple_archetypes(void);
+void test_system_user_data(void);
+void test_system_empty_query(void);
+void test_system_no_matching_archetypes(void);
+void test_system_archetype_filtering(void);
+void stress_system_many_archetypes(void);
+void stress_system_complex_queries(void);
+void benchmark_system_execution(void);
+void benchmark_system_filtering(void);
+void benchmark_system_iteration(void);
+
 int32_t main(int32_t argc, char **argv) {
     (void)argc;
     (void)argv;
@@ -210,6 +243,47 @@ int32_t main(int32_t argc, char **argv) {
     benchmark_ecs_set_component();
     benchmark_ecs_full_workflow();
     benchmark_ecs_archetype_lookup();
+
+    YULDUZ_LOG_INFO("\n--- QUERY TESTS ---");
+    test_query_initialization();
+    test_query_component_types();
+    test_query_tag_types();
+    test_query_mixed_requirements();
+    test_query_deep_copy();
+    test_query_access_types();
+    test_query_sorting();
+    test_query_capacity_growth();
+    test_query_edge_cases();
+
+    YULDUZ_LOG_INFO("\n--- QUERY STRESS TESTS ---");
+    stress_query_many_requirements();
+    stress_query_copy_operations();
+
+    YULDUZ_LOG_INFO("\n--- QUERY BENCHMARKS ---");
+    benchmark_query_creation();
+    benchmark_query_copy();
+    benchmark_query_modification();
+
+    YULDUZ_LOG_INFO("\n--- SYSTEM TESTS ---");
+    test_system_initialization();
+    test_system_basic_execution();
+    test_system_query_matching();
+    test_system_read_write_access();
+    test_system_with_tags();
+    test_system_multiple_archetypes();
+    test_system_user_data();
+    test_system_empty_query();
+    test_system_no_matching_archetypes();
+    test_system_archetype_filtering();
+
+    YULDUZ_LOG_INFO("\n--- SYSTEM STRESS TESTS ---");
+    stress_system_many_archetypes();
+    stress_system_complex_queries();
+
+    YULDUZ_LOG_INFO("\n--- SYSTEM BENCHMARKS ---");
+    benchmark_system_execution();
+    benchmark_system_filtering();
+    benchmark_system_iteration();
 
     YULDUZ_ReleaseTypeRegistry(&registry);
 
@@ -1387,7 +1461,6 @@ void benchmark_entity_mixed_ops(void) {
     YULDUZ_ReleaseEntityRegistry(&registry);
 }
 
-
 // Setup function for ECS tests (call in main before tests)
 void setup_ecs_test_types(YULDUZ_ECSRegistry *registry) {
     YULDUZ_LOG_INFO("\n[SETUP] Registering ECS Test Types");
@@ -1400,8 +1473,7 @@ void setup_ecs_test_types(YULDUZ_ECSRegistry *registry) {
         {"Name", sizeof(Name), alignof(Name)},
         {"TagPlayer", 0, 0},  // Zero-size tag
         {"TagEnemy", 0, 0},
-        {"TagDead", 0, 0}
-    };
+        {"TagDead", 0, 0}};
 
     YULDUZ_Type type_ids[8];
 
@@ -1411,12 +1483,12 @@ void setup_ecs_test_types(YULDUZ_ECSRegistry *registry) {
 
     g_position_type = type_ids[0];
     g_velocity_type = type_ids[1];
-    g_health_type = type_ids[2];
-    g_damage_type = type_ids[3];
-    g_name_type = type_ids[4];
-    g_tag_player = type_ids[5];
-    g_tag_enemy = type_ids[6];
-    g_tag_dead = type_ids[7];
+    g_health_type   = type_ids[2];
+    g_damage_type   = type_ids[3];
+    g_name_type     = type_ids[4];
+    g_tag_player    = type_ids[5];
+    g_tag_enemy     = type_ids[6];
+    g_tag_dead      = type_ids[7];
 
     YULDUZ_LOG_INFO("  ✓ Registered 8 types (5 components + 3 tags)");
 }
@@ -1429,10 +1501,9 @@ void test_ecs_null_archetype(void) {
     YULDUZ_LOG_INFO("\n[TEST] Null Archetype");
 
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialEntityCapacity = 16,
+        .InitialEntityCapacity    = 16,
         .InitialComponentCapacity = 16,
-        .InitialArchetypeCapacity = 16
-    };
+        .InitialArchetypeCapacity = 16};
 
     YULDUZ_ECSRegistry registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
@@ -1461,7 +1532,7 @@ void test_ecs_add_remove_tags(void) {
     YULDUZ_LOG_INFO("\n[TEST] Add/Remove Tags");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1497,7 +1568,7 @@ void test_ecs_add_remove_components(void) {
     YULDUZ_LOG_INFO("\n[TEST] Add/Remove Components");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1539,7 +1610,7 @@ void test_ecs_component_migration(void) {
     YULDUZ_LOG_INFO("\n[TEST] Component Migration");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1562,7 +1633,7 @@ void test_ecs_component_migration(void) {
     // Verify all components preserved
     Position pos2;
     Velocity vel2;
-    Health health2;
+    Health   health2;
 
     SDL_assert(YULDUZ_GetComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos2));
     SDL_assert(YULDUZ_GetComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &vel2));
@@ -1591,7 +1662,7 @@ void test_ecs_tag_component_combinations(void) {
     YULDUZ_LOG_INFO("\n[TEST] Tag + Component Combinations");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1632,7 +1703,7 @@ void test_ecs_archetype_reuse(void) {
     YULDUZ_LOG_INFO("\n[TEST] Archetype Reuse");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1686,7 +1757,7 @@ void test_ecs_set_get_components(void) {
     YULDUZ_LOG_INFO("\n[TEST] Set/Get Components");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1719,7 +1790,7 @@ void test_ecs_invalid_operations(void) {
     YULDUZ_LOG_INFO("\n[TEST] Invalid Operations");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1754,7 +1825,7 @@ void test_ecs_edge_cases(void) {
     YULDUZ_LOG_INFO("\n[TEST] Edge Cases");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1789,7 +1860,7 @@ void test_ecs_entity_destruction(void) {
     YULDUZ_LOG_INFO("\n[TEST] Entity Destruction");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1830,7 +1901,7 @@ void test_ecs_archetype_growth(void) {
     YULDUZ_LOG_INFO("\n[TEST] Archetype Growth");
 
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialEntityCapacity = 4,
+        .InitialEntityCapacity    = 4,
         .InitialComponentCapacity = 4,
         .InitialArchetypeCapacity = 2  // Small initial capacity
     };
@@ -1882,7 +1953,7 @@ void test_ecs_multiple_migrations(void) {
     YULDUZ_LOG_INFO("\n[TEST] Multiple Migrations");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1901,7 +1972,9 @@ void test_ecs_multiple_migrations(void) {
     YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_health_type, &health);
 
     // Verify all three
-    Position p; Velocity v; Health h;
+    Position p;
+    Velocity v;
+    Health   h;
     SDL_assert(YULDUZ_GetComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &p));
     SDL_assert(YULDUZ_GetComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &v));
     SDL_assert(YULDUZ_GetComponentWithTypeInECSRegistry(&registry, entity, g_health_type, &h));
@@ -1933,7 +2006,7 @@ void test_ecs_zero_size_components(void) {
     YULDUZ_LOG_INFO("\n[TEST] Zero-Size Components (Tags)");
 
     YULDUZ_ECSRegistryInitializeInfo info = {16, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -1969,11 +2042,11 @@ void stress_ecs_create_destroy_cycles(void) {
     YULDUZ_LOG_INFO("\n[STRESS] Create/Destroy Cycles");
 
     YULDUZ_ECSRegistryInitializeInfo info = {1000, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
-    const uint32_t cycles = 100;
+    const uint32_t cycles             = 100;
     const uint32_t entities_per_cycle = 100;
 
     for (uint32_t cycle = 0; cycle < cycles; cycle++) {
@@ -2003,7 +2076,7 @@ void stress_ecs_component_churn(void) {
     YULDUZ_LOG_INFO("\n[STRESS] Component Churn");
 
     YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 32};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -2015,8 +2088,8 @@ void stress_ecs_component_churn(void) {
 
     // Randomly add/remove components 1000 times
     for (uint32_t i = 0; i < 1000; i++) {
-        uint32_t entity_idx = i % 50;
-        YULDUZ_Entity entity = entities[entity_idx];
+        uint32_t      entity_idx = i % 50;
+        YULDUZ_Entity entity     = entities[entity_idx];
 
         uint32_t operation = i % 6;
 
@@ -2062,14 +2135,14 @@ void stress_ecs_archetype_explosion(void) {
     YULDUZ_LOG_INFO("\n[STRESS] Archetype Explosion");
 
     YULDUZ_ECSRegistryInitializeInfo info = {200, 16, 64};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
     // Create entities with all possible combinations of 3 components
     // 2^3 = 8 combinations (including none)
     YULDUZ_Entity entities[64];
-    uint32_t entity_idx = 0;
+    uint32_t      entity_idx = 0;
 
     for (uint32_t mask = 0; mask < 8; mask++) {
         for (uint32_t rep = 0; rep < 8; rep++) {
@@ -2113,11 +2186,11 @@ void benchmark_ecs_entity_spawn(void) {
     YULDUZ_LOG_INFO("\n[BENCHMARK] Entity Spawn");
 
     YULDUZ_ECSRegistryInitializeInfo info = {100000, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
-    const uint32_t count = 50000;
+    const uint32_t count    = 50000;
     YULDUZ_Entity *entities = SDL_malloc(count * sizeof(YULDUZ_Entity));
 
     uint64_t start = SDL_GetPerformanceCounter();
@@ -2127,7 +2200,7 @@ void benchmark_ecs_entity_spawn(void) {
     }
 
     uint64_t end = SDL_GetPerformanceCounter();
-    double ms = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
 
     YULDUZ_LOG_INFO("  50,000 spawns: %.2f ms (%.0f ops/sec)", ms, 50000.0 / (ms / 1000.0));
 
@@ -2139,11 +2212,11 @@ void benchmark_ecs_add_component(void) {
     YULDUZ_LOG_INFO("\n[BENCHMARK] Add Component");
 
     YULDUZ_ECSRegistryInitializeInfo info = {50000, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
-    const uint32_t count = 50000;
+    const uint32_t count    = 50000;
     YULDUZ_Entity *entities = SDL_malloc(count * sizeof(YULDUZ_Entity));
 
     for (uint32_t i = 0; i < count; i++) {
@@ -2158,7 +2231,7 @@ void benchmark_ecs_add_component(void) {
     }
 
     uint64_t end = SDL_GetPerformanceCounter();
-    double ms = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
 
     YULDUZ_LOG_INFO("  50,000 component adds: %.2f ms (%.0f ops/sec)", ms, 50000.0 / (ms / 1000.0));
 
@@ -2170,11 +2243,11 @@ void benchmark_ecs_remove_component(void) {
     YULDUZ_LOG_INFO("\n[BENCHMARK] Remove Component");
 
     YULDUZ_ECSRegistryInitializeInfo info = {50000, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
-    const uint32_t count = 50000;
+    const uint32_t count    = 50000;
     YULDUZ_Entity *entities = SDL_malloc(count * sizeof(YULDUZ_Entity));
 
     for (uint32_t i = 0; i < count; i++) {
@@ -2190,7 +2263,7 @@ void benchmark_ecs_remove_component(void) {
     }
 
     uint64_t end = SDL_GetPerformanceCounter();
-    double ms = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
 
     YULDUZ_LOG_INFO("  50,000 component removes: %.2f ms (%.0f ops/sec)", ms, 50000.0 / (ms / 1000.0));
 
@@ -2202,11 +2275,11 @@ void benchmark_ecs_add_tag(void) {
     YULDUZ_LOG_INFO("\n[BENCHMARK] Add Tag");
 
     YULDUZ_ECSRegistryInitializeInfo info = {50000, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
-    const uint32_t count = 50000;
+    const uint32_t count    = 50000;
     YULDUZ_Entity *entities = SDL_malloc(count * sizeof(YULDUZ_Entity));
 
     for (uint32_t i = 0; i < count; i++) {
@@ -2220,7 +2293,7 @@ void benchmark_ecs_add_tag(void) {
     }
 
     uint64_t end = SDL_GetPerformanceCounter();
-    double ms = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
 
     YULDUZ_LOG_INFO("  50,000 tag adds: %.2f ms (%.0f ops/sec)", ms, 50000.0 / (ms / 1000.0));
 
@@ -2232,12 +2305,12 @@ void benchmark_ecs_get_component(void) {
     YULDUZ_LOG_INFO("\n[BENCHMARK] Get Component");
 
     YULDUZ_ECSRegistryInitializeInfo info = {10000, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
     const uint32_t entity_count = 10000;
-    YULDUZ_Entity *entities = SDL_malloc(entity_count * sizeof(YULDUZ_Entity));
+    YULDUZ_Entity *entities     = SDL_malloc(entity_count * sizeof(YULDUZ_Entity));
 
     for (uint32_t i = 0; i < entity_count; i++) {
         YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
@@ -2246,7 +2319,7 @@ void benchmark_ecs_get_component(void) {
     }
 
     const uint32_t iterations = 10000;
-    Position pos;
+    Position       pos;
 
     uint64_t start = SDL_GetPerformanceCounter();
 
@@ -2257,7 +2330,7 @@ void benchmark_ecs_get_component(void) {
     }
 
     uint64_t end = SDL_GetPerformanceCounter();
-    double ms = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
 
     YULDUZ_LOG_INFO("  100,000,000 gets: %.2f ms (%.0f ops/sec)", ms, 100000000.0 / (ms / 1000.0));
 
@@ -2269,12 +2342,12 @@ void benchmark_ecs_set_component(void) {
     YULDUZ_LOG_INFO("\n[BENCHMARK] Set Component");
 
     YULDUZ_ECSRegistryInitializeInfo info = {10000, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
     const uint32_t entity_count = 10000;
-    YULDUZ_Entity *entities = SDL_malloc(entity_count * sizeof(YULDUZ_Entity));
+    YULDUZ_Entity *entities     = SDL_malloc(entity_count * sizeof(YULDUZ_Entity));
 
     for (uint32_t i = 0; i < entity_count; i++) {
         YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
@@ -2294,7 +2367,7 @@ void benchmark_ecs_set_component(void) {
     }
 
     uint64_t end = SDL_GetPerformanceCounter();
-    double ms = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
 
     YULDUZ_LOG_INFO("  100,000,000 sets: %.2f ms (%.0f ops/sec)", ms, 100000000.0 / (ms / 1000.0));
 
@@ -2306,7 +2379,7 @@ void benchmark_ecs_full_workflow(void) {
     YULDUZ_LOG_INFO("\n[BENCHMARK] Full Workflow");
 
     YULDUZ_ECSRegistryInitializeInfo info = {10000, 16, 16};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -2347,7 +2420,7 @@ void benchmark_ecs_full_workflow(void) {
     }
 
     uint64_t end = SDL_GetPerformanceCounter();
-    double ms = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
 
     YULDUZ_LOG_INFO("  10,000 full workflows: %.2f ms (%.0f ops/sec)", ms, 10000.0 / (ms / 1000.0));
 
@@ -2358,7 +2431,7 @@ void benchmark_ecs_archetype_lookup(void) {
     YULDUZ_LOG_INFO("\n[BENCHMARK] Archetype Lookup");
 
     YULDUZ_ECSRegistryInitializeInfo info = {1000, 16, 32};
-    YULDUZ_ECSRegistry registry;
+    YULDUZ_ECSRegistry               registry;
     YULDUZ_InitializeECSRegistry(&registry, &info);
     setup_ecs_test_types(&registry);
 
@@ -2407,10 +2480,1096 @@ void benchmark_ecs_archetype_lookup(void) {
     }
 
     uint64_t end = SDL_GetPerformanceCounter();
-    double ms = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
 
     YULDUZ_LOG_INFO("  1,000,000 archetype lookups: %.2f ms (%.0f ops/sec)", ms, 1000000.0 / (ms / 1000.0));
 
+    YULDUZ_ReleaseECSRegistry(&registry);
+}
+
+// ============================================================================
+// QUERY TESTS
+// ============================================================================
+
+void test_query_initialization(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Initialization");
+
+    YULDUZ_Query query;
+    SDL_assert(YULDUZ_InitializeQuery(&query, 4, 2));
+
+    SDL_assert(query.RequiredComponentCapacity == 4);
+    SDL_assert(query.RequiredComponentCount == 0);
+    SDL_assert(query.RequiredTagCapacity == 2);
+    SDL_assert(query.RequiredTagCount == 0);
+    SDL_assert(query.RequiredComponentTypes != nullptr);
+    SDL_assert(query.SortedRequiredComponentTypes != nullptr);
+    SDL_assert(query.RequiredComponentAccessTypes != nullptr);
+    SDL_assert(query.RequiredTagTypes != nullptr);
+    SDL_assert(query.SortedRequiredTagTypes != nullptr);
+
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ Query initialized and released correctly");
+}
+
+void test_query_component_types(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Component Types");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 2);
+
+    // Add component with read access
+    SDL_assert(YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read));
+    SDL_assert(query.RequiredComponentCount == 1);
+    SDL_assert(query.RequiredComponentTypes[0] == g_position_type);
+    SDL_assert(query.RequiredComponentAccessTypes[0] == YULDUZ_QueryAccessType_Read);
+
+    // Add component with write access
+    SDL_assert(YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Write));
+    SDL_assert(query.RequiredComponentCount == 2);
+
+    // Verify sorted array is maintained
+    SDL_assert(query.SortedRequiredComponentTypes[0] <= query.SortedRequiredComponentTypes[1]);
+
+    // Update existing component access type
+    SDL_assert(YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Write));
+    SDL_assert(query.RequiredComponentCount == 2);  // Count should not increase
+
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ Component types added and updated correctly");
+}
+
+void test_query_tag_types(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Tag Types");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 2, 4);
+
+    // Add tags
+    SDL_assert(YULDUZ_SetQueryWithTagType(&query, g_tag_player));
+    SDL_assert(query.RequiredTagCount == 1);
+    SDL_assert(query.RequiredTagTypes[0] == g_tag_player);
+
+    SDL_assert(YULDUZ_SetQueryWithTagType(&query, g_tag_enemy));
+    SDL_assert(query.RequiredTagCount == 2);
+
+    SDL_assert(YULDUZ_SetQueryWithTagType(&query, g_tag_dead));
+    SDL_assert(query.RequiredTagCount == 3);
+
+    // Verify sorted array is maintained
+    SDL_assert(query.SortedRequiredTagTypes[0] <= query.SortedRequiredTagTypes[1]);
+    SDL_assert(query.SortedRequiredTagTypes[1] <= query.SortedRequiredTagTypes[2]);
+
+    // Adding duplicate should not increase count
+    SDL_assert(YULDUZ_SetQueryWithTagType(&query, g_tag_player));
+    SDL_assert(query.RequiredTagCount == 3);
+
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ Tag types added correctly with deduplication");
+}
+
+void test_query_mixed_requirements(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Mixed Requirements");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 8, 4);
+
+    // Add mix of components and tags
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Write);
+    YULDUZ_SetQueryWithComponentType(&query, g_health_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_SetQueryWithTagType(&query, g_tag_player);
+    YULDUZ_SetQueryWithTagType(&query, g_tag_enemy);
+
+    SDL_assert(query.RequiredComponentCount == 3);
+    SDL_assert(query.RequiredTagCount == 2);
+
+    // Verify sorting of both arrays
+    for (uint32_t i = 0; i < query.RequiredComponentCount - 1; i++) {
+        SDL_assert(query.SortedRequiredComponentTypes[i] <= query.SortedRequiredComponentTypes[i + 1]);
+    }
+    for (uint32_t i = 0; i < query.RequiredTagCount - 1; i++) {
+        SDL_assert(query.SortedRequiredTagTypes[i] <= query.SortedRequiredTagTypes[i + 1]);
+    }
+
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ Mixed components and tags handled correctly");
+}
+
+void test_query_deep_copy(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Deep Copy");
+
+    YULDUZ_Query src;
+    YULDUZ_InitializeQuery(&src, 4, 4);
+
+    YULDUZ_SetQueryWithComponentType(&src, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&src, g_velocity_type, YULDUZ_QueryAccessType_Write);
+    YULDUZ_SetQueryWithTagType(&src, g_tag_player);
+
+    YULDUZ_Query dst;
+    SDL_assert(YULDUZ_DeepCopyQuery(&src, &dst));
+
+    // Verify counts match
+    SDL_assert(dst.RequiredComponentCount == src.RequiredComponentCount);
+    SDL_assert(dst.RequiredTagCount == src.RequiredTagCount);
+
+    // Verify component types and access types
+    for (uint32_t i = 0; i < src.RequiredComponentCount; i++) {
+        SDL_assert(dst.RequiredComponentTypes[i] == src.RequiredComponentTypes[i]);
+        SDL_assert(dst.RequiredComponentAccessTypes[i] == src.RequiredComponentAccessTypes[i]);
+        SDL_assert(dst.SortedRequiredComponentTypes[i] == src.SortedRequiredComponentTypes[i]);
+    }
+
+    // Verify tag types
+    for (uint32_t i = 0; i < src.RequiredTagCount; i++) {
+        SDL_assert(dst.RequiredTagTypes[i] == src.RequiredTagTypes[i]);
+        SDL_assert(dst.SortedRequiredTagTypes[i] == src.SortedRequiredTagTypes[i]);
+    }
+
+    // Verify arrays are different (deep copy)
+    SDL_assert(dst.RequiredComponentTypes != src.RequiredComponentTypes);
+    SDL_assert(dst.RequiredTagTypes != src.RequiredTagTypes);
+
+    YULDUZ_ReleaseQuery(&src);
+    YULDUZ_ReleaseQuery(&dst);
+    YULDUZ_LOG_INFO("  ✓ Deep copy created independent query");
+}
+
+void test_query_access_types(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Access Types");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 2);
+
+    // Add with read access
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    SDL_assert(query.RequiredComponentAccessTypes[0] == YULDUZ_QueryAccessType_Read);
+
+    // Update to write access
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Write);
+    SDL_assert(query.RequiredComponentAccessTypes[0] == YULDUZ_QueryAccessType_Write);
+    SDL_assert(query.RequiredComponentCount == 1);  // Should not duplicate
+
+    // Add another with write access
+    YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Write);
+    SDL_assert(query.RequiredComponentCount == 2);
+
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ Access types tracked correctly");
+}
+
+void test_query_sorting(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Sorting");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 8, 8);
+
+    // Add in random order
+    YULDUZ_SetQueryWithComponentType(&query, g_damage_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_health_type, YULDUZ_QueryAccessType_Read);
+
+    // Verify sorted array is actually sorted
+    for (uint32_t i = 0; i < query.RequiredComponentCount - 1; i++) {
+        SDL_assert(query.SortedRequiredComponentTypes[i] < query.SortedRequiredComponentTypes[i + 1]);
+    }
+
+    // Same for tags
+    YULDUZ_SetQueryWithTagType(&query, g_tag_dead);
+    YULDUZ_SetQueryWithTagType(&query, g_tag_player);
+    YULDUZ_SetQueryWithTagType(&query, g_tag_enemy);
+
+    for (uint32_t i = 0; i < query.RequiredTagCount - 1; i++) {
+        SDL_assert(query.SortedRequiredTagTypes[i] < query.SortedRequiredTagTypes[i + 1]);
+    }
+
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ Sorted arrays maintained correctly");
+}
+
+void test_query_capacity_growth(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Capacity Growth");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 2, 2);
+
+    // Fill initial capacity
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Read);
+
+    uint32_t old_capacity = query.RequiredComponentCapacity;
+
+    // Add one more to trigger growth
+    YULDUZ_SetQueryWithComponentType(&query, g_health_type, YULDUZ_QueryAccessType_Read);
+
+    SDL_assert(query.RequiredComponentCapacity > old_capacity);
+    SDL_assert(query.RequiredComponentCount == 3);
+
+    // Do the same for tags
+    YULDUZ_SetQueryWithTagType(&query, g_tag_player);
+    YULDUZ_SetQueryWithTagType(&query, g_tag_enemy);
+
+    old_capacity = query.RequiredTagCapacity;
+
+    YULDUZ_SetQueryWithTagType(&query, g_tag_dead);
+
+    SDL_assert(query.RequiredTagCapacity > old_capacity);
+    SDL_assert(query.RequiredTagCount == 3);
+
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ Capacity grows correctly");
+}
+
+void test_query_edge_cases(void) {
+    YULDUZ_LOG_INFO("\n[TEST] Query Edge Cases");
+
+    // Empty query
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    SDL_assert(query.RequiredComponentCount == 0);
+    SDL_assert(query.RequiredTagCount == 0);
+    YULDUZ_ReleaseQuery(&query);
+
+    // Minimal capacity
+    YULDUZ_InitializeQuery(&query, 1, 1);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    SDL_assert(query.RequiredComponentCount == 1);
+    YULDUZ_ReleaseQuery(&query);
+
+    YULDUZ_LOG_INFO("  ✓ Edge cases handled correctly");
+}
+
+void stress_query_many_requirements(void) {
+    YULDUZ_LOG_INFO("\n[STRESS] Query Many Requirements");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 2, 2);
+
+    const uint32_t component_count = 100;
+
+    // Add many components (will use same types repeatedly)
+    for (uint32_t i = 0; i < component_count; i++) {
+        YULDUZ_Type            type   = (i % 5) + 1;  // Cycle through 5 types
+        YULDUZ_QueryAccessType access = (i % 2) ? YULDUZ_QueryAccessType_Write : YULDUZ_QueryAccessType_Read;
+        YULDUZ_SetQueryWithComponentType(&query, type, access);
+    }
+
+    // Should only have 5 unique components
+    SDL_assert(query.RequiredComponentCount == 5);
+
+    // Verify sorting is maintained
+    for (uint32_t i = 0; i < query.RequiredComponentCount - 1; i++) {
+        SDL_assert(query.SortedRequiredComponentTypes[i] < query.SortedRequiredComponentTypes[i + 1]);
+    }
+
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ Handled %d insertions, deduped to 5 components", component_count);
+}
+
+void stress_query_copy_operations(void) {
+    YULDUZ_LOG_INFO("\n[STRESS] Query Copy Operations");
+
+    YULDUZ_Query original;
+    YULDUZ_InitializeQuery(&original, 4, 4);
+
+    YULDUZ_SetQueryWithComponentType(&original, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&original, g_velocity_type, YULDUZ_QueryAccessType_Write);
+    YULDUZ_SetQueryWithTagType(&original, g_tag_player);
+
+    const uint32_t copy_count = 1000;
+    YULDUZ_Query  *copies     = SDL_malloc(copy_count * sizeof(YULDUZ_Query));
+
+    for (uint32_t i = 0; i < copy_count; i++) {
+        SDL_assert(YULDUZ_DeepCopyQuery(&original, &copies[i]));
+    }
+
+    // Verify all copies
+    for (uint32_t i = 0; i < copy_count; i++) {
+        SDL_assert(copies[i].RequiredComponentCount == original.RequiredComponentCount);
+        SDL_assert(copies[i].RequiredTagCount == original.RequiredTagCount);
+        YULDUZ_ReleaseQuery(&copies[i]);
+    }
+
+    SDL_free(copies);
+    YULDUZ_ReleaseQuery(&original);
+    YULDUZ_LOG_INFO("  ✓ Created and verified %d deep copies", copy_count);
+}
+
+void benchmark_query_creation(void) {
+    YULDUZ_LOG_INFO("\n[BENCHMARK] Query Creation");
+
+    const uint32_t count = 100000;
+
+    uint64_t start = SDL_GetPerformanceCounter();
+
+    for (uint32_t i = 0; i < count; i++) {
+        YULDUZ_Query query;
+        YULDUZ_InitializeQuery(&query, 4, 4);
+        YULDUZ_ReleaseQuery(&query);
+    }
+
+    uint64_t end = SDL_GetPerformanceCounter();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+
+    YULDUZ_LOG_INFO("  100,000 query create/release: %.2f ms (%.0f ops/sec)", ms, 100000.0 / (ms / 1000.0));
+}
+
+void benchmark_query_copy(void) {
+    YULDUZ_LOG_INFO("\n[BENCHMARK] Query Deep Copy");
+
+    YULDUZ_Query src;
+    YULDUZ_InitializeQuery(&src, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&src, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&src, g_velocity_type, YULDUZ_QueryAccessType_Write);
+    YULDUZ_SetQueryWithTagType(&src, g_tag_player);
+
+    const uint32_t count   = 100000;
+    YULDUZ_Query  *queries = SDL_malloc(count * sizeof(YULDUZ_Query));
+
+    uint64_t start = SDL_GetPerformanceCounter();
+
+    for (uint32_t i = 0; i < count; i++) {
+        YULDUZ_DeepCopyQuery(&src, &queries[i]);
+    }
+
+    uint64_t end = SDL_GetPerformanceCounter();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+
+    YULDUZ_LOG_INFO("  100,000 deep copies: %.2f ms (%.0f ops/sec)", ms, 100000.0 / (ms / 1000.0));
+
+    for (uint32_t i = 0; i < count; i++) {
+        YULDUZ_ReleaseQuery(&queries[i]);
+    }
+    SDL_free(queries);
+    YULDUZ_ReleaseQuery(&src);
+}
+
+void benchmark_query_modification(void) {
+    YULDUZ_LOG_INFO("\n[BENCHMARK] Query Modification");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+
+    const uint32_t count = 1000000;
+
+    uint64_t start = SDL_GetPerformanceCounter();
+
+    for (uint32_t i = 0; i < count; i++) {
+        YULDUZ_Type            type   = (i % 5) + 1;
+        YULDUZ_QueryAccessType access = (i % 2) ? YULDUZ_QueryAccessType_Write : YULDUZ_QueryAccessType_Read;
+        YULDUZ_SetQueryWithComponentType(&query, type, access);
+    }
+
+    uint64_t end = SDL_GetPerformanceCounter();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+
+    YULDUZ_LOG_INFO("  1,000,000 component additions: %.2f ms (%.0f ops/sec)", ms, 1000000.0 / (ms / 1000.0));
+
+    YULDUZ_ReleaseQuery(&query);
+}
+
+// ============================================================================
+// SYSTEM TESTS
+// ============================================================================
+
+// Helper system functions
+static uint32_t g_system_call_count   = 0;
+static uint32_t g_system_entity_count = 0;
+
+void CountingSystemPFN(YULDUZ_Archetype *archetype, const YULDUZ_Query *query, void *user_data) {
+    (void)query;
+    (void)user_data;
+    g_system_call_count++;
+    g_system_entity_count += archetype->DenseCount;
+}
+
+void ModifyPositionSystemPFN(YULDUZ_Archetype *archetype, const YULDUZ_Query *query, void *user_data) {
+    (void)query;
+    float delta = *(float *)user_data;
+
+    YULDUZ_ComponentStore *pos_store = YULDUZ_QueryStoreInArchetype(archetype, g_position_type);
+    if (!pos_store) return;
+
+    for (uint32_t i = 0; i < archetype->DenseCount; i++) {
+        Position *pos = (Position *)YULDUZ_GetComponentInComponentStore(pos_store, i);
+        pos->x += delta;
+        pos->y += delta;
+        pos->z += delta;
+    }
+}
+
+void ReadOnlySystemPFN(YULDUZ_Archetype *archetype, const YULDUZ_Query *query, void *user_data) {
+    (void)query;
+    uint32_t *sum = (uint32_t *)user_data;
+
+    YULDUZ_ComponentStore *pos_store = YULDUZ_QueryStoreInArchetype(archetype, g_position_type);
+    if (!pos_store) return;
+
+    for (uint32_t i = 0; i < archetype->DenseCount; i++) {
+        Position *pos = (Position *)YULDUZ_GetComponentInComponentStore(pos_store, i);
+        *sum += (uint32_t)(pos->x + pos->y + pos->z);
+    }
+}
+
+void test_system_initialization(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System Initialization");
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    SDL_assert(YULDUZ_InitializeSystem(&system, "TestSystem", &query, &CountingSystemPFN));
+
+    SDL_assert(system.Name != nullptr);
+    SDL_assert(SDL_strcmp(system.Name, "TestSystem") == 0);
+    SDL_assert(system.SystemPFN == &CountingSystemPFN);
+    SDL_assert(system.Query.RequiredComponentCount == query.RequiredComponentCount);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_LOG_INFO("  ✓ System initialized correctly");
+}
+
+void test_system_basic_execution(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System Basic Execution");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create entities with Position
+    for (uint32_t i = 0; i < 10; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, (float)i, (float)i};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+    }
+
+    // Create system
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "CountingSystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    SDL_assert(YULDUZ_RunSystem(&system, &registry, nullptr));
+
+    SDL_assert(g_system_call_count > 0);
+    SDL_assert(g_system_entity_count == 10);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ System executed on %d entities", g_system_entity_count);
+}
+
+void test_system_query_matching(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System Query Matching");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create entities with different component combinations
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, 0, 0};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+    }
+
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, 0, 0};
+        Velocity vel = {1, 1, 1};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &vel);
+    }
+
+    // System requiring Position AND Velocity
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "FilteringSystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    YULDUZ_RunSystem(&system, &registry, nullptr);
+
+    // Should only process entities with both components
+    SDL_assert(g_system_entity_count == 5);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ System filtered correctly (5 out of 10 entities)");
+}
+
+void test_system_read_write_access(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System Read/Write Access");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create entities
+    YULDUZ_Entity entities[10];
+    for (uint32_t i = 0; i < 10; i++) {
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
+        Position pos = {1.0f, 2.0f, 3.0f};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entities[i], g_position_type, &pos);
+    }
+
+    // System with write access
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Write);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "ModifySystem", &query, &ModifyPositionSystemPFN);
+
+    float delta = 10.0f;
+    YULDUZ_RunSystem(&system, &registry, &delta);
+
+    // Verify modification
+    Position pos;
+    YULDUZ_GetComponentWithTypeInECSRegistry(&registry, entities[0], g_position_type, &pos);
+    SDL_assert(pos.x == 11.0f);
+    SDL_assert(pos.y == 12.0f);
+    SDL_assert(pos.z == 13.0f);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ System modified components correctly");
+}
+
+void test_system_with_tags(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System With Tags");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create entities with and without tags
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, 0, 0};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+        YULDUZ_AddTagWithTypeInECSRegistry(&registry, entity, g_tag_player);
+    }
+
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, 0, 0};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+    }
+
+    // System requiring Position + Player tag
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithTagType(&query, g_tag_player);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "PlayerSystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    YULDUZ_RunSystem(&system, &registry, nullptr);
+
+    SDL_assert(g_system_entity_count == 5);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ System filtered by tags correctly");
+}
+
+void test_system_multiple_archetypes(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System Multiple Archetypes");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create entities in different archetypes, all with Position
+    for (uint32_t i = 0; i < 3; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, 0, 0};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+    }
+
+    for (uint32_t i = 0; i < 4; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, 0, 0};
+        Velocity vel = {1, 1, 1};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &vel);
+    }
+
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos    = {(float)i, 0, 0};
+        Health   health = {100, 100};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_health_type, &health);
+    }
+
+    // System requiring only Position (should match all)
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "UniversalSystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    YULDUZ_RunSystem(&system, &registry, nullptr);
+
+    SDL_assert(g_system_entity_count == 12);  // 3 + 4 + 5
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ System processed multiple archetypes");
+}
+
+void test_system_user_data(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System User Data");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create entities
+    for (uint32_t i = 0; i < 10; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, (float)i, (float)i};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+    }
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "ReadSystem", &query, &ReadOnlySystemPFN);
+
+    uint32_t sum = 0;
+    YULDUZ_RunSystem(&system, &registry, &sum);
+
+    // Expected sum: 0+0+0 + 1+1+1 + ... + 9+9+9 = 3*(0+1+2+...+9) = 3*45 = 135
+    SDL_assert(sum == 135);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ User data passed correctly (sum=%d)", sum);
+}
+
+void test_system_empty_query(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System Empty Query");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create some entities
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+    }
+
+    // Empty query (no requirements)
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "EmptyQuerySystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    YULDUZ_RunSystem(&system, &registry, nullptr);
+
+    // Should match all archetypes including null archetype
+    SDL_assert(g_system_entity_count == 5);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ Empty query matched all entities");
+}
+
+void test_system_no_matching_archetypes(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System No Matching Archetypes");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create entities without the queried component
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Velocity vel = {1, 1, 1};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &vel);
+    }
+
+    // Query for Position (which no entity has)
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "NoMatchSystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    YULDUZ_RunSystem(&system, &registry, nullptr);
+
+    SDL_assert(g_system_entity_count == 0);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ System handled no matches correctly");
+}
+
+void test_system_archetype_filtering(void) {
+    YULDUZ_LOG_INFO("\n[TEST] System Archetype Filtering");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100, 16, 16};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create diverse archetypes
+    for (uint32_t mask = 0; mask < 8; mask++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+
+        if (mask & 1) {
+            Position pos = {0, 0, 0};
+            YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+        }
+        if (mask & 2) {
+            Velocity vel = {0, 0, 0};
+            YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &vel);
+        }
+        if (mask & 4) {
+            YULDUZ_AddTagWithTypeInECSRegistry(&registry, entity, g_tag_player);
+        }
+    }
+
+    // Query for Position + Velocity (no tag requirement)
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "FilterSystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    YULDUZ_RunSystem(&system, &registry, nullptr);
+
+    // Should match: mask 3 (pos+vel), mask 7 (pos+vel+tag)
+    SDL_assert(g_system_entity_count == 2);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ Filtered %d matching entities from 8 archetypes", g_system_entity_count);
+}
+
+void stress_system_many_archetypes(void) {
+    YULDUZ_LOG_INFO("\n[STRESS] System Many Archetypes");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {10000, 64, 64};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create many different archetypes
+    const uint32_t archetype_count = 32;
+    for (uint32_t mask = 0; mask < archetype_count; mask++) {
+        for (uint32_t e = 0; e < 10; e++) {
+            YULDUZ_Entity entity;
+            YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+
+            if (mask & 1) {
+                Position pos = {0, 0, 0};
+                YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+            }
+            if (mask & 2) {
+                Velocity vel = {0, 0, 0};
+                YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &vel);
+            }
+            if (mask & 4) {
+                Health health = {100, 100};
+                YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_health_type, &health);
+            }
+            if (mask & 8) {
+                Damage damage = {10};
+                YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_damage_type, &damage);
+            }
+            if (mask & 16) {
+                YULDUZ_AddTagWithTypeInECSRegistry(&registry, entity, g_tag_player);
+            }
+        }
+    }
+
+    // System requiring just Position
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "StressSystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    YULDUZ_RunSystem(&system, &registry, nullptr);
+
+    // 16 archetypes have Position (all odd masks)
+    SDL_assert(g_system_entity_count == 160);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ Processed %d entities across many archetypes", g_system_entity_count);
+}
+
+void stress_system_complex_queries(void) {
+    YULDUZ_LOG_INFO("\n[STRESS] System Complex Queries");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {10000, 64, 64};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create entities with various combinations
+    const uint32_t entity_count = 1000;
+    for (uint32_t i = 0; i < entity_count; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+
+        Position pos = {(float)i, 0, 0};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+
+        if (i % 2 == 0) {
+            Velocity vel = {1, 1, 1};
+            YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &vel);
+        }
+        if (i % 3 == 0) {
+            Health health = {100, 100};
+            YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_health_type, &health);
+        }
+        if (i % 5 == 0) {
+            YULDUZ_AddTagWithTypeInECSRegistry(&registry, entity, g_tag_player);
+        }
+    }
+
+    // Complex query: Position + Velocity + Health + Player tag
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 8, 8);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_health_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithTagType(&query, g_tag_player);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "ComplexSystem", &query, &CountingSystemPFN);
+
+    g_system_call_count   = 0;
+    g_system_entity_count = 0;
+
+    YULDUZ_RunSystem(&system, &registry, nullptr);
+
+    // Entities matching: divisible by 2, 3, and 5 = divisible by 30
+    uint32_t expected = entity_count / 30;
+    SDL_assert(g_system_entity_count == expected);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+    YULDUZ_LOG_INFO("  ✓ Complex query matched %d entities", g_system_entity_count);
+}
+
+void benchmark_system_execution(void) {
+    YULDUZ_LOG_INFO("\n[BENCHMARK] System Execution");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100000, 32, 32};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    const uint32_t entity_count = 50000;
+    for (uint32_t i = 0; i < entity_count; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {(float)i, (float)i, (float)i};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+    }
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "BenchSystem", &query, &CountingSystemPFN);
+
+    const uint32_t iterations = 1000;
+
+    uint64_t start = SDL_GetPerformanceCounter();
+
+    for (uint32_t i = 0; i < iterations; i++) {
+        g_system_call_count   = 0;
+        g_system_entity_count = 0;
+        YULDUZ_RunSystem(&system, &registry, nullptr);
+    }
+
+    uint64_t end = SDL_GetPerformanceCounter();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+
+    YULDUZ_LOG_INFO("  1,000 runs on 50,000 entities: %.2f ms (%.0f runs/sec)", ms, 1000.0 / (ms / 1000.0));
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+}
+
+void benchmark_system_filtering(void) {
+    YULDUZ_LOG_INFO("\n[BENCHMARK] System Filtering");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100000, 64, 64};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    // Create many archetypes with varying components
+    for (uint32_t mask = 0; mask < 64; mask++) {
+        for (uint32_t e = 0; e < 100; e++) {
+            YULDUZ_Entity entity;
+            YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+
+            if (mask & 1) {
+                Position pos = {0, 0, 0};
+                YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+            }
+            if (mask & 2) {
+                Velocity vel = {0, 0, 0};
+                YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_velocity_type, &vel);
+            }
+            if (mask & 4) {
+                Health health = {100, 100};
+                YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_health_type, &health);
+            }
+        }
+    }
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, g_velocity_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "FilterBenchSystem", &query, &CountingSystemPFN);
+
+    const uint32_t iterations = 1000;
+
+    uint64_t start = SDL_GetPerformanceCounter();
+
+    for (uint32_t i = 0; i < iterations; i++) {
+        g_system_call_count   = 0;
+        g_system_entity_count = 0;
+        YULDUZ_RunSystem(&system, &registry, nullptr);
+    }
+
+    uint64_t end = SDL_GetPerformanceCounter();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+
+    YULDUZ_LOG_INFO("  1,000 filtered runs: %.2f ms (%.0f runs/sec)", ms, 1000.0 / (ms / 1000.0));
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&registry);
+}
+
+void benchmark_system_iteration(void) {
+    YULDUZ_LOG_INFO("\n[BENCHMARK] System Iteration");
+
+    YULDUZ_ECSRegistryInitializeInfo info = {100000, 32, 32};
+    YULDUZ_ECSRegistry               registry;
+    YULDUZ_InitializeECSRegistry(&registry, &info);
+    setup_ecs_test_types(&registry);
+
+    const uint32_t entity_count = 100000;
+    for (uint32_t i = 0; i < entity_count; i++) {
+        YULDUZ_Entity entity;
+        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+        Position pos = {1.0f, 2.0f, 3.0f};
+        YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, g_position_type, &pos);
+    }
+
+    YULDUZ_Query query;
+    YULDUZ_InitializeQuery(&query, 4, 4);
+    YULDUZ_SetQueryWithComponentType(&query, g_position_type, YULDUZ_QueryAccessType_Write);
+
+    YULDUZ_System system;
+    YULDUZ_InitializeSystem(&system, "IterationBenchSystem", &query, &ModifyPositionSystemPFN);
+
+    const uint32_t iterations = 100;
+    float          delta      = 1.0f;
+
+    uint64_t start = SDL_GetPerformanceCounter();
+
+    for (uint32_t i = 0; i < iterations; i++) {
+        YULDUZ_RunSystem(&system, &registry, &delta);
+    }
+
+    uint64_t end = SDL_GetPerformanceCounter();
+    double   ms  = (double)(end - start) * 1000.0 / SDL_GetPerformanceFrequency();
+
+    YULDUZ_LOG_INFO("  100 iterations on 100,000 entities: %.2f ms (%.0f M ops/sec)",
+                    ms, (100.0 * 100000.0 / 1000000.0) / (ms / 1000.0));
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
     YULDUZ_ReleaseECSRegistry(&registry);
 }
 

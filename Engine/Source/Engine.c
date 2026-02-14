@@ -5,20 +5,27 @@ YULDUZ_Engine *g_pEngine = nullptr;
 bool YULDUZ_InitializeEngine(YULDUZ_Engine *engine, YULDUZ_NULLABLE const YULDUZ_EngineInitializeInfo *initialize_info) {
     SDL_zerop(engine);
 
-    uint32_t initial_component_types_capacity = 64;
-    uint32_t initial_entities_capacity        = 64;
+    uint32_t initial_entity_capacity         = 64;
+    uint32_t initial_component_capacity      = 64;
+    uint32_t initial_archetype_capacity      = 64;
+    uint32_t initial_archetype_type_capacity = 64;
 
     if (nullptr != initialize_info) {
-        initial_entities_capacity        = initialize_info->InitialEntitiesCapacity;
-        initial_component_types_capacity = initialize_info->InitialComponentTypesCapacity;
+        uint32_t initial_entity_capacity         = initialize_info->InitialEntityCapacity;
+        uint32_t initial_component_capacity      = initialize_info->InitialComponentCapacity;
+        uint32_t initial_archetype_capacity      = initialize_info->InitialArchetypeCapacity;
+        uint32_t initial_archetype_type_capacity = initialize_info->InitialArchetypeTypeCapacity;
     }
 
-    // if (!YULDUZ_InitializeEntityRegistry(&engine->EntityRegistry, initial_entities_capacity)) {
-        // return false;
-    // }
-    // if (!YULDUZ_InitializeTypeRegistry(&engine->ComponentTypeRegistry, initial_component_types_capacity)) {
-        // return false;
-    // }
+    YULDUZ_ECSRegistryInitializeInfo ecs_registry_initialize_info = {0};
+
+    ecs_registry_initialize_info.InitialEntityCapacity    = initial_entity_capacity;
+    ecs_registry_initialize_info.InitialComponentCapacity = initial_component_capacity;
+    ecs_registry_initialize_info.InitialArchetypeCapacity = initial_archetype_capacity;
+
+    if (!YULDUZ_InitializeECSRegistry(&engine->ECSRegistry, &ecs_registry_initialize_info)) {
+        return false;
+    }
 
     SDL_SetAtomicU32(&engine->IsRunning, false);
 
@@ -28,9 +35,7 @@ bool YULDUZ_InitializeEngine(YULDUZ_Engine *engine, YULDUZ_NULLABLE const YULDUZ
 }
 
 void YULDUZ_ReleaseEngine(YULDUZ_Engine *engine) {
-    // YULDUZ_ReleaseTypeRegistry(&engine->ComponentTypeRegistry);
-    // YULDUZ_ReleaseEntityRegistry(&engine->EntityRegistry);
-
+    YULDUZ_ReleaseECSRegistry(&engine->ECSRegistry);
     SDL_zerop(engine);
 }
 

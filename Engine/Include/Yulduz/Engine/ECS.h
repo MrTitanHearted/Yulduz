@@ -28,6 +28,7 @@ struct YULDUZ_ECSRegistryInitializeInfo {
     uint32_t InitialEntityCapacity;
     uint32_t InitialComponentCapacity;
     uint32_t InitialArchetypeCapacity;
+    uint32_t InitialArchetypeTypeCapacity;
 };
 
 YULDUZ_API bool YULDUZ_InitializeECSRegistry(
@@ -86,3 +87,14 @@ YULDUZ_API bool YULDUZ_AddComponentWithTypeInECSRegistry(
     YULDUZ_Type component_type, YULDUZ_NULLABLE const void *component_data);
 YULDUZ_API bool YULDUZ_RemoveComponentWithTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type component_type);
+
+// both component and tag types must be sorted!
+// MUST SDL_free the result always!
+YULDUZ_API YULDUZ_ArchetypeType *YULDUZ_QueryArchetypesInECSRegistry(
+    YULDUZ_ECSRegistry *registry,
+    const YULDUZ_Type *required_component_types, uint32_t required_component_count,
+    const YULDUZ_Type *required_tag_types, uint32_t required_tag_count,
+    uint32_t *archetype_type_count);
+
+YULDUZ_API YULDUZ_Archetype *YULDUZ_GetArchetypeInECSRegistry(
+    YULDUZ_ECSRegistry *registry, YULDUZ_ArchetypeType archetype_type);

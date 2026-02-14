@@ -241,7 +241,7 @@ bool YULDUZ_PushCommandInCommandBuffer(YULDUZ_CommandBuffer *command_buffer, con
 }
 
 uint32_t YULDUZ_PushArenaDataInCommandBuffer(YULDUZ_CommandBuffer *command_buffer, uint32_t size, const void *data) {
-    if (nullptr != data) {
+    if (nullptr == data) {
         return YULDUZ_INVALID_ARENA_POINTER_IN_COMMAND_BUFFER;
     }
 
