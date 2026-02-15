@@ -43,7 +43,7 @@ bool YULDUZ_RegisterTypesInTypeRegistry(
 }
 
 bool YULDUZ_GetTypesInTypeRegistry(
-    YULDUZ_TypeRegistry *registry, const char **type_names, YULDUZ_Type *types, uint32_t type_count) {
+    const YULDUZ_TypeRegistry *registry, const char **type_names, YULDUZ_Type *types, uint32_t type_count) {
     bool found_all = true;
 
     for (uint32_t j = 0; j < type_count; j++) {
@@ -65,7 +65,7 @@ bool YULDUZ_GetTypesInTypeRegistry(
 }
 
 bool YULDUZ_GetTypeInfosInTypeRegistry(
-    YULDUZ_TypeRegistry *registry, const char **type_names, YULDUZ_TypeInfo *type_infos, uint32_t type_count) {
+    const YULDUZ_TypeRegistry *registry, const char **type_names, YULDUZ_TypeInfo *type_infos, uint32_t type_count) {
     bool found_all = true;
 
     for (uint32_t j = 0; j < type_count; j++) {
@@ -91,7 +91,7 @@ bool YULDUZ_GetTypeInfosInTypeRegistry(
 }
 
 bool YULDUZ_GetTypeDescriptionsInTypeRegistry(
-    YULDUZ_TypeRegistry *registry, const YULDUZ_Type *types,
+    const YULDUZ_TypeRegistry *registry, const YULDUZ_Type *types,
     YULDUZ_TypeDescription *type_descriptions, uint32_t type_count) {
     bool found_all = true;
 
@@ -123,14 +123,14 @@ void YULDUZ_SDL_SortTypes(YULDUZ_Type *types, uint32_t count) {
         SDL_qsort(types, count, sizeof(YULDUZ_Type), YULDUZ_SDL_CompareTypes);
 }
 
-void YULDUZ_SDL_SortDataInfos(YULDUZ_DataInfo *infos, uint32_t count) {
-    if (count > 1)
-        SDL_qsort(infos, count, sizeof(YULDUZ_DataInfo), YULDUZ_SDL_CompareTypes);
-}
-
-void YULDUZ_SDL_SortTypeDescriptions(YULDUZ_TypeInfo *infos, uint32_t count) {
+void YULDUZ_SDL_SortTypeInfos(YULDUZ_TypeInfo *infos, uint32_t count) {
     if (count > 1)
         SDL_qsort(infos, count, sizeof(YULDUZ_TypeInfo), YULDUZ_SDL_CompareTypes);
+}
+
+void YULDUZ_SDL_SortTypeDataInfos(YULDUZ_TypeDataInfo *infos, uint32_t count) {
+    if (count > 1)
+        SDL_qsort(infos, count, sizeof(YULDUZ_TypeDataInfo), YULDUZ_SDL_CompareTypes);
 }
 
 void YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(YULDUZ_TypeRegistry *registry, uint32_t count) {

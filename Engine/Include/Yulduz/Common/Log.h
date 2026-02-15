@@ -43,7 +43,7 @@ struct YULDUZ_LogEntry {
     YULDUZ_LogLevel LogLevel;
 };
 
-YULDUZ_API bool YULDUZ_InitializeLogs(YULDUZ_Logger loggers[2]);
+YULDUZ_API bool YULDUZ_InitializeLogs(YULDUZ_Logger *engine_logger, YULDUZ_Logger *application_logger);
 YULDUZ_API void YULDUZ_ReleaseLogs();
 
 YULDUZ_API void YULDUZ_Log(

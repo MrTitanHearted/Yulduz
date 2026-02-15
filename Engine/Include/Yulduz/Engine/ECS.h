@@ -5,6 +5,7 @@
 #include <Yulduz/Engine/Type.h>
 #include <Yulduz/Engine/Entity.h>
 #include <Yulduz/Engine/EntityRegistry.h>
+#include <Yulduz/Engine/Query.h>
 
 typedef struct YULDUZ_ECSRegistry YULDUZ_ECSRegistry;
 typedef struct YULDUZ_ECSRegistryInitializeInfo
@@ -16,54 +17,54 @@ struct YULDUZ_ECSRegistry {
 
     YULDUZ_Archetype *Dense;
 
+    uint32_t DenseCapacity;
+    uint32_t DenseCount;
+
     YULDUZ_ArchetypeType NullArchetypeType;
 
     uint32_t InitialArchetypeCapacity;
-
-    uint32_t DenseCapacity;
-    uint32_t DenseCount;
 };
 
 struct YULDUZ_ECSRegistryInitializeInfo {
+    uint32_t InitialTypeCapacity;
     uint32_t InitialEntityCapacity;
-    uint32_t InitialComponentCapacity;
     uint32_t InitialArchetypeCapacity;
     uint32_t InitialArchetypeTypeCapacity;
 };
 
-YULDUZ_API bool YULDUZ_InitializeECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_NULLABLE const YULDUZ_ECSRegistryInitializeInfo *info);
+YULDUZ_API bool YULDUZ_InitializeECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_ECSRegistryInitializeInfo info);
 YULDUZ_API void YULDUZ_ReleaseECSRegistry(YULDUZ_ECSRegistry *registry);
 
 YULDUZ_API bool YULDUZ_RegisterTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_TypeDescription description, YULDUZ_NULLABLE YULDUZ_Type *type);
 
-YULDUZ_API bool YULDUZ_GetTypeInECSRegistry(YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_Type *type);
-YULDUZ_API bool YULDUZ_GetTypeInfoInECSRegistry(YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_TypeInfo *info);
+YULDUZ_API bool YULDUZ_GetTypeInECSRegistry(const YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_Type *type);
+YULDUZ_API bool YULDUZ_GetTypeInfoInECSRegistry(const YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_TypeInfo *info);
 YULDUZ_API bool YULDUZ_GetTypeDescriptionInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Type type, YULDUZ_TypeDescription *description);
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Type type, YULDUZ_TypeDescription *description);
 
 YULDUZ_API bool YULDUZ_CreateEntityInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity *entity);
 YULDUZ_API bool YULDUZ_DestroyEntityInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity);
 
-YULDUZ_API bool YULDUZ_HasTagInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *tag_name);
+YULDUZ_API bool YULDUZ_HasTagInECSRegistry(const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *tag_name);
 
 // Sets existing component data (immediate, no archetype change)
 // Returns false if entity doesn't have this component
 YULDUZ_API bool YULDUZ_SetComponentInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
     const char *component_name, YULDUZ_NULLABLE const void *component_data);
 YULDUZ_API bool YULDUZ_GetComponentInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
     const char *component_name, void *component_data);
 
-YULDUZ_API bool YULDUZ_HasTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type);
+YULDUZ_API bool YULDUZ_HasTagWithTypeInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type);
 
 YULDUZ_API bool YULDUZ_SetComponentWithTypeInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
     YULDUZ_Type component_type, YULDUZ_NULLABLE const void *component_data);
 YULDUZ_API bool YULDUZ_GetComponentWithTypeInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
     YULDUZ_Type component_type, void *component_data);
 
 YULDUZ_API bool YULDUZ_AddTagInECSRegistry(
@@ -88,13 +89,9 @@ YULDUZ_API bool YULDUZ_AddComponentWithTypeInECSRegistry(
 YULDUZ_API bool YULDUZ_RemoveComponentWithTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type component_type);
 
-// both component and tag types must be sorted!
-// MUST SDL_free the result always!
-YULDUZ_API YULDUZ_ArchetypeType *YULDUZ_QueryArchetypesInECSRegistry(
-    YULDUZ_ECSRegistry *registry,
-    const YULDUZ_Type *required_component_types, uint32_t required_component_count,
-    const YULDUZ_Type *required_tag_types, uint32_t required_tag_count,
-    uint32_t *archetype_type_count);
+YULDUZ_API bool YULDUZ_GetArchetypeCountInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, uint32_t *archetype_count);
 
+// Unsafe index!
 YULDUZ_API YULDUZ_Archetype *YULDUZ_GetArchetypeInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_ArchetypeType archetype_type);
+    const YULDUZ_ECSRegistry *registry, YULDUZ_ArchetypeType archetype_type);

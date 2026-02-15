@@ -1,6 +1,6 @@
 #include <Yulduz/Engine/Archetype.h>
 
-bool YULDUZ_EnsureDenseCapacityInArchetype(YULDUZ_Archetype *archetype);
+void YULDUZ_EnsureDenseCapacityInArchetype(YULDUZ_Archetype *archetype);
 
 bool YULDUZ_InitializeArchetype(
     YULDUZ_Archetype      *archetype,
@@ -10,19 +10,24 @@ bool YULDUZ_InitializeArchetype(
     SDL_zerop(archetype);
 
     archetype->StoreCount = component_count;
-    archetype->Stores     = SDL_malloc(sizeof(YULDUZ_ComponentStore) * component_count);
+    archetype->Stores     = nullptr;
+    if (component_count > 0) {
+        archetype->Stores = SDL_malloc(sizeof(YULDUZ_ComponentStore) * component_count);
+        for (uint32_t i = 0; i < component_count; i++) {
+            YULDUZ_InitializeComponentStore(&archetype->Stores[i], component_types[i], initial_capacity);
+        }
+    }
 
-    for (uint32_t i = 0; i < component_count; i++) {
-        YULDUZ_InitializeComponentStore(&archetype->Stores[i], component_types[i], initial_capacity);
+    archetype->TagCount = tag_count;
+    archetype->Tags     = nullptr;
+    if (tag_count > 0) {
+        archetype->Tags = SDL_malloc(sizeof(YULDUZ_Type) * tag_count);
+        SDL_memcpy(archetype->Tags, tags, sizeof(YULDUZ_Type) * tag_count);
     }
 
     archetype->DenseCapacity = initial_capacity;
     archetype->DenseCount    = 0;
     archetype->Dense         = SDL_malloc(sizeof(YULDUZ_Entity) * initial_capacity);
-
-    archetype->TagCount = tag_count;
-    archetype->Tags     = SDL_malloc(sizeof(YULDUZ_Type) * tag_count);
-    SDL_memcpy(archetype->Tags, tags, sizeof(YULDUZ_Type) * tag_count);
 
     return true;
 }
@@ -41,10 +46,8 @@ void YULDUZ_ReleaseArchetype(YULDUZ_Archetype *archetype) {
 
 bool YULDUZ_AddInArchetype(
     YULDUZ_Archetype *archetype, YULDUZ_Entity entity,
-    const YULDUZ_DataInfo *component_data, YULDUZ_ArchetypeIndex *index) {
-    if (!YULDUZ_EnsureDenseCapacityInArchetype(archetype)) {
-        return false;
-    }
+    const YULDUZ_TypeDataInfo *component_data, YULDUZ_ArchetypeIndex *index) {
+    YULDUZ_EnsureDenseCapacityInArchetype(archetype);
 
     YULDUZ_ArchetypeIndex dense_index = archetype->DenseCount;
 
@@ -65,10 +68,14 @@ bool YULDUZ_AddInArchetype(
     return true;
 }
 
-bool YULDUZ_RemoveInArchetype(YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index) {
+bool YULDUZ_RemoveInArchetype(YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index, YULDUZ_Entity *moved_entity) {
+    *moved_entity = YULDUZ_INVALID_ENTITY;
+
     YULDUZ_ArchetypeIndex last_index = archetype->DenseCount - 1;
     if (last_index != index) {
         archetype->Dense[index] = archetype->Dense[last_index];
+
+        *moved_entity = archetype->Dense[index];
 
         for (uint32_t i = 0; i < archetype->StoreCount; i++) {
             YULDUZ_CopyBackComponentInComponentStore(&archetype->Stores[i], index, last_index);
@@ -78,13 +85,21 @@ bool YULDUZ_RemoveInArchetype(YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex
     return true;
 }
 
-bool YULDUZ_MoveEntityInArchetype(
-    YULDUZ_Archetype *src, YULDUZ_Archetype *dst,
-    const YULDUZ_DataInfo *component_data, uint32_t component_count,
-    YULDUZ_ArchetypeIndex src_index, YULDUZ_ArchetypeIndex *dst_index) {
-    if (!YULDUZ_EnsureDenseCapacityInArchetype(dst)) {
+bool YULDUZ_SetEntityInArchetype(const YULDUZ_Archetype *archetype, YULDUZ_Entity entity, YULDUZ_ArchetypeIndex index) {
+    if (index >= archetype->DenseCount) {
         return false;
     }
+    archetype->Dense[index] = entity;
+    return true;
+}
+
+bool YULDUZ_MoveEntityInArchetype(
+    YULDUZ_Archetype *src, YULDUZ_Archetype *dst,
+    const YULDUZ_TypeDataInfo *component_data, uint32_t component_count,
+    YULDUZ_ArchetypeIndex src_index, YULDUZ_ArchetypeIndex *dst_index,
+    YULDUZ_Entity *src_moved_entity) {
+    YULDUZ_EnsureDenseCapacityInArchetype(dst);
+
     YULDUZ_ArchetypeIndex dst_dense_index = dst->DenseCount;
 
     for (uint32_t i = 0; i < dst->StoreCount; i++) {
@@ -101,8 +116,8 @@ bool YULDUZ_MoveEntityInArchetype(
             continue;
         }
 
-        const YULDUZ_DataInfo *info = SDL_bsearch(
-            &dst_store->Type, component_data, component_count, sizeof(YULDUZ_DataInfo), YULDUZ_SDL_CompareTypes);
+        const YULDUZ_TypeDataInfo *info = SDL_bsearch(
+            &dst_store->Type, component_data, component_count, sizeof(YULDUZ_TypeDataInfo), YULDUZ_SDL_CompareTypes);
         if (nullptr != info && nullptr != info->Data)
             SDL_memcpy(dst_element, info->Data, dst_element_size);
         else
@@ -114,44 +129,47 @@ bool YULDUZ_MoveEntityInArchetype(
     dst->Dense[dst_dense_index] = src_entity;
     dst->DenseCount++;
     *dst_index = dst_dense_index;
-    YULDUZ_RemoveInArchetype(src, src_index);
+
+    *src_moved_entity = YULDUZ_INVALID_ENTITY;
+
+    YULDUZ_ArchetypeIndex src_last_index = src->DenseCount - 1;
+    if (src_last_index != src_index) {
+        src->Dense[src_index] = src->Dense[src_last_index];
+
+        *src_moved_entity = src->Dense[src_index];
+
+        for (uint32_t i = 0; i < src->StoreCount; i++) {
+            YULDUZ_CopyBackComponentInComponentStore(&src->Stores[i], src_index, src_last_index);
+        }
+    }
+    src->DenseCount--;
 
     return true;
 }
 
-YULDUZ_Type *YULDUZ_QueryTagInArchetype(YULDUZ_Archetype *archetype, YULDUZ_Type tag) {
-    return SDL_bsearch(
-        &tag, archetype->Tags, archetype->TagCount, sizeof(YULDUZ_Type), YULDUZ_SDL_CompareTypes);
-}
-
-YULDUZ_ComponentStore *YULDUZ_QueryStoreInArchetype(YULDUZ_Archetype *archetype, YULDUZ_Type type) {
-    return SDL_bsearch(
-        &type, archetype->Stores, archetype->StoreCount, sizeof(YULDUZ_ComponentStore), YULDUZ_SDL_CompareTypes);
-}
-bool YULDUZ_QueryStoresInArchetype(
-    YULDUZ_Archetype  *archetype,
-    const YULDUZ_Type *component_types, uint32_t component_count,
-    const YULDUZ_Type *tags, uint32_t tag_count,
-    YULDUZ_ComponentStore **stores) {
-    for (uint32_t i = 0; i < tag_count; i++) {
-        if (nullptr == YULDUZ_QueryTagInArchetype(archetype, tags[i])) {
-            return false;
-        }
+YULDUZ_Type *YULDUZ_QueryTagInArchetype(const YULDUZ_Archetype *archetype, YULDUZ_Type tag_type) {
+    if (0 == archetype->TagCount || nullptr == archetype->Tags) {
+        return nullptr;
     }
-
-    bool found_all = true;
-
-    for (uint32_t i = 0; i < component_count; i++) {
-        stores[i] = YULDUZ_QueryStoreInArchetype(archetype, component_types[i]);
-        found_all = found_all && stores[i];
-    }
-
-    return found_all;
+    return SDL_bsearch(
+        &tag_type, archetype->Tags, archetype->TagCount, sizeof(YULDUZ_Type), YULDUZ_SDL_CompareTypes);
 }
 
-bool YULDUZ_EnsureDenseCapacityInArchetype(YULDUZ_Archetype *archetype) {
+YULDUZ_ComponentStore *YULDUZ_QueryStoreInArchetype(const YULDUZ_Archetype *archetype, YULDUZ_Type component_type) {
+    if (0 == archetype->StoreCount || nullptr == archetype->Stores) {
+        return nullptr;
+    }
+    return SDL_bsearch(
+        &component_type, archetype->Stores, archetype->StoreCount, sizeof(YULDUZ_ComponentStore), YULDUZ_SDL_CompareTypes);
+}
+
+YULDUZ_Entity YULDUZ_GetEntityInArchetype(const YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index) {
+    return archetype->Dense[index];
+}
+
+void YULDUZ_EnsureDenseCapacityInArchetype(YULDUZ_Archetype *archetype) {
     if (archetype->DenseCount < archetype->DenseCapacity) {
-        return true;
+        return;
     }
 
     uint32_t old_capacity = archetype->DenseCapacity;
@@ -159,20 +177,11 @@ bool YULDUZ_EnsureDenseCapacityInArchetype(YULDUZ_Archetype *archetype) {
 
     YULDUZ_Entity *old_dense = archetype->Dense;
     YULDUZ_Entity *new_dense = SDL_realloc(old_dense, sizeof(YULDUZ_Entity) * new_capacity);
-    if (nullptr == new_dense) {
-        return false;
-    }
 
     archetype->DenseCapacity = new_capacity;
     archetype->Dense         = new_dense;
 
-    bool reallocated_all = true;
-
     for (uint32_t i = 0; i < archetype->StoreCount; i++) {
-        reallocated_all =
-            YULDUZ_ReallocateComponentStore(&archetype->Stores[i], old_capacity, new_capacity) &&
-            reallocated_all;
+        YULDUZ_ReallocateComponentStore(&archetype->Stores[i], old_capacity, new_capacity);
     }
-
-    return reallocated_all;
 }

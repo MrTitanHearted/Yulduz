@@ -12,9 +12,9 @@ const char *g_LogLevelNames[] = {
     "TRACE",
 };
 
-bool YULDUZ_InitializeLogs(YULDUZ_Logger loggers[2]) {
-    g_pEngineLogger      = &loggers[0];
-    g_pApplicationLogger = &loggers[1];
+bool YULDUZ_InitializeLogs(YULDUZ_Logger *engine_logger, YULDUZ_Logger *application_logger) {
+    g_pEngineLogger      = engine_logger;
+    g_pApplicationLogger = application_logger;
     return true;
 }
 

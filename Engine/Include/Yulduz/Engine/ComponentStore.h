@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Yulduz/Common.h>
-
 #include <Yulduz/Engine/Type.h>
 
 typedef uint32_t YULDUZ_ComponentIndex;
@@ -15,19 +13,19 @@ struct YULDUZ_ComponentStore {
 
     uint8_t *Dense;
 
-    uint32_t TypeSize;
     uint32_t TypeAlignment;
+    uint32_t TypeSize;
 };
 
 constexpr YULDUZ_ComponentIndex YULDUZ_INVALID_COMPONENT_INDEX = 0xFFFFFFFF;
 
 YULDUZ_API bool YULDUZ_InitializeComponentStore(
-    YULDUZ_ComponentStore *store, YULDUZ_TypeInfo type_description, uint32_t initial_capacity);
+    YULDUZ_ComponentStore *store, YULDUZ_TypeInfo type_info, uint32_t initial_capacity);
 YULDUZ_API void YULDUZ_ReleaseComponentStore(YULDUZ_ComponentStore *store);
 
-YULDUZ_API bool YULDUZ_ReallocateComponentStore(YULDUZ_ComponentStore *store, uint32_t old_capacity, uint32_t new_capacity);
+YULDUZ_API void YULDUZ_ReallocateComponentStore(YULDUZ_ComponentStore *store, uint32_t old_capacity, uint32_t new_capacity);
 
 YULDUZ_API void YULDUZ_CopyBackComponentInComponentStore(
-    YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex index, YULDUZ_ComponentIndex back_index);
+    const YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex index, YULDUZ_ComponentIndex back_index);
 
-YULDUZ_API void *YULDUZ_GetComponentInComponentStore(YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex index);
+YULDUZ_API void *YULDUZ_GetComponentInComponentStore(const YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex index);

@@ -1,31 +1,25 @@
 #include <Yulduz/Engine/ECS.h>
 
-bool YULDUZ_GetArchetypeTypeInECSRegistry(
+bool YULDUZ_GenerateArchetypeTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry,
     const YULDUZ_Type *component_types, uint32_t component_count,
     const YULDUZ_Type *tag_types, uint32_t tag_count,
     YULDUZ_ArchetypeType *archetype_type);
 
-bool YULDUZ_EnsureDenseCapacityInECSRegistry(YULDUZ_ECSRegistry *registry);
+void YULDUZ_EnsureDenseCapacityInECSRegistry(YULDUZ_ECSRegistry *registry);
 
-bool YULDUZ_InitializeECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_NULLABLE const YULDUZ_ECSRegistryInitializeInfo *info) {
+bool YULDUZ_InitializeECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_ECSRegistryInitializeInfo info) {
     SDL_zerop(registry);
-    uint32_t initial_entity_capacity         = 64;
-    uint32_t initial_component_capacity      = 64;
-    uint32_t initial_archetype_capacity      = 64;
-    uint32_t initial_archetype_type_capacity = 64;
 
-    if (nullptr != info) {
-        initial_entity_capacity         = info->InitialEntityCapacity;
-        initial_component_capacity      = info->InitialComponentCapacity;
-        initial_archetype_capacity      = info->InitialArchetypeCapacity;
-        initial_archetype_type_capacity = info->InitialArchetypeTypeCapacity;
-    }
+    uint32_t initial_type_capacity           = info.InitialTypeCapacity;
+    uint32_t initial_entity_capacity         = info.InitialEntityCapacity;
+    uint32_t initial_archetype_capacity      = info.InitialArchetypeCapacity;
+    uint32_t initial_archetype_type_capacity = info.InitialArchetypeTypeCapacity;
 
-    if (!YULDUZ_InitializeEntityRegistry(&registry->EntityRegistry, initial_entity_capacity)) {
+    if (!YULDUZ_InitializeTypeRegistry(&registry->TypeRegistry, initial_type_capacity)) {
         return false;
     }
-    if (!YULDUZ_InitializeTypeRegistry(&registry->TypeRegistry, initial_component_capacity)) {
+    if (!YULDUZ_InitializeEntityRegistry(&registry->EntityRegistry, initial_entity_capacity)) {
         return false;
     }
 
@@ -35,7 +29,7 @@ bool YULDUZ_InitializeECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_NULLABLE 
 
     registry->InitialArchetypeCapacity = initial_archetype_capacity;
 
-    return YULDUZ_GetArchetypeTypeInECSRegistry(registry, nullptr, 0, nullptr, 0, &registry->NullArchetypeType);
+    return YULDUZ_GenerateArchetypeTypeInECSRegistry(registry, nullptr, 0, nullptr, 0, &registry->NullArchetypeType);
 }
 
 void YULDUZ_ReleaseECSRegistry(YULDUZ_ECSRegistry *registry) {
@@ -54,28 +48,36 @@ bool YULDUZ_RegisterTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_TypeD
     return YULDUZ_RegisterTypesInTypeRegistry(&registry->TypeRegistry, &description, type, 1);
 }
 
-bool YULDUZ_GetTypeInECSRegistry(YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_Type *type) {
+bool YULDUZ_GetTypeInECSRegistry(const YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_Type *type) {
     return YULDUZ_GetTypesInTypeRegistry(&registry->TypeRegistry, &name, type, 1);
 }
 
-bool YULDUZ_GetTypeInfoInECSRegistry(YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_TypeInfo *info) {
+bool YULDUZ_GetTypeInfoInECSRegistry(const YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_TypeInfo *info) {
     return YULDUZ_GetTypeInfosInTypeRegistry(&registry->TypeRegistry, &name, info, 1);
 }
 
 bool YULDUZ_GetTypeDescriptionInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Type type, YULDUZ_TypeDescription *description) {
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Type type, YULDUZ_TypeDescription *description) {
     return YULDUZ_GetTypeDescriptionsInTypeRegistry(&registry->TypeRegistry, &type, description, 1);
 }
 
 bool YULDUZ_CreateEntityInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity *entity) {
-    if (!YULDUZ_CreateEntityInEntityRegistry(&registry->EntityRegistry, entity))
-        return false;
     YULDUZ_EntityRecord record = (YULDUZ_EntityRecord){.ArchetypeType = registry->NullArchetypeType};
-    if (!YULDUZ_AddInArchetype(&registry->Dense[registry->NullArchetypeType], *entity, nullptr, &record.ArchetypeIndex)) {
-        YULDUZ_DestroyEntityInEntityRegistry(&registry->EntityRegistry, *entity);
+    if (!YULDUZ_AddInArchetype(
+            &registry->Dense[registry->NullArchetypeType], YULDUZ_INVALID_ENTITY, nullptr, &record.ArchetypeIndex)) {
         return false;
     }
-    return YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, entity, &record, 1);
+    if (!YULDUZ_CreateEntityInEntityRegistry(
+            &registry->EntityRegistry, record.ArchetypeType, record.ArchetypeIndex, entity)) {
+        YULDUZ_Entity moved_entity;
+        YULDUZ_RemoveInArchetype(&registry->Dense[record.ArchetypeType], record.ArchetypeIndex, &moved_entity);
+        if (YULDUZ_INVALID_ENTITY != moved_entity) {
+            YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &moved_entity, &record, 1);
+        }
+        return false;
+    }
+    YULDUZ_SetEntityInArchetype(&registry->Dense[registry->NullArchetypeType], *entity, record.ArchetypeIndex);
+    return true;
 }
 
 bool YULDUZ_DestroyEntityInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity) {
@@ -83,15 +85,20 @@ bool YULDUZ_DestroyEntityInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Enti
     if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
         return false;
     }
-    if (!YULDUZ_RemoveInArchetype(&registry->Dense[record.ArchetypeType], record.ArchetypeIndex)) {
+    YULDUZ_Entity moved_entity;
+    if (!YULDUZ_RemoveInArchetype(&registry->Dense[record.ArchetypeType], record.ArchetypeIndex, &moved_entity)) {
         return false;
+    }
+    if (YULDUZ_INVALID_ENTITY != moved_entity) {
+        YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &moved_entity, &record, 1);
     }
     return YULDUZ_DestroyEntityInEntityRegistry(&registry->EntityRegistry, entity);
 }
 
-bool YULDUZ_HasTagInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *tag_name) {
+bool YULDUZ_HasTagInECSRegistry(const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *tag_name) {
     YULDUZ_EntityRecord record = {0};
-    YULDUZ_Type         tag_type;
+
+    YULDUZ_Type tag_type;
     if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
         return false;
     }
@@ -102,9 +109,10 @@ bool YULDUZ_HasTagInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity enti
 }
 
 bool YULDUZ_SetComponentInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *component_name, const void *component_data) {
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *component_name, const void *component_data) {
     YULDUZ_EntityRecord record = {0};
-    YULDUZ_Type         component_type;
+
+    YULDUZ_Type component_type;
     if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
         return false;
     }
@@ -120,9 +128,10 @@ bool YULDUZ_SetComponentInECSRegistry(
 }
 
 bool YULDUZ_GetComponentInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *component_name, void *component_data) {
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *component_name, void *component_data) {
     YULDUZ_EntityRecord record = {0};
-    YULDUZ_Type         component_type;
+
+    YULDUZ_Type component_type;
     if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
         return false;
     }
@@ -137,7 +146,7 @@ bool YULDUZ_GetComponentInECSRegistry(
     return true;
 }
 
-bool YULDUZ_HasTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type) {
+bool YULDUZ_HasTagWithTypeInECSRegistry(const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type) {
     YULDUZ_EntityRecord record = {0};
     if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
         return false;
@@ -146,7 +155,7 @@ bool YULDUZ_HasTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Ent
 }
 
 bool YULDUZ_SetComponentWithTypeInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type component_type, const void *component_data) {
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type component_type, const void *component_data) {
     YULDUZ_EntityRecord record = {0};
     if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
         return false;
@@ -160,7 +169,7 @@ bool YULDUZ_SetComponentWithTypeInECSRegistry(
 }
 
 bool YULDUZ_GetComponentWithTypeInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type component_type, void *component_data) {
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type component_type, void *component_data) {
     YULDUZ_EntityRecord record = {0};
     if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
         return false;
@@ -207,32 +216,41 @@ bool YULDUZ_RemoveComponentInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_En
 }
 
 bool YULDUZ_AddTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type) {
-    YULDUZ_EntityRecord record = {0};
-    if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
+    YULDUZ_EntityRecord src_record = {0};
+    if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &src_record, 1)) {
         return false;
     }
 
-    YULDUZ_Archetype *src_archetype = &registry->Dense[record.ArchetypeType];
+    YULDUZ_Archetype *src_archetype = &registry->Dense[src_record.ArchetypeType];
 
     if (nullptr != YULDUZ_QueryTagInArchetype(src_archetype, tag_type)) {
         return true;
     }
 
-    YULDUZ_Type *new_tags = SDL_stack_alloc(YULDUZ_Type, src_archetype->TagCount + 1);
+    uint32_t new_tag_count = src_archetype->TagCount + 1;
+
+    YULDUZ_Type *new_tags = SDL_stack_alloc(YULDUZ_Type, new_tag_count);
     SDL_memcpy(new_tags, src_archetype->Tags, sizeof(YULDUZ_Type) * src_archetype->TagCount);
     new_tags[src_archetype->TagCount] = tag_type;
-    YULDUZ_SDL_SortTypes(new_tags, src_archetype->TagCount + 1);
+    YULDUZ_SDL_SortTypes(new_tags, new_tag_count);
 
     YULDUZ_Type *components = SDL_stack_alloc(YULDUZ_Type, src_archetype->StoreCount);
     for (uint32_t i = 0; i < src_archetype->StoreCount; i++) {
         components[i] = src_archetype->Stores[i].Type;
     }
 
+    YULDUZ_QueryInfo query = {0};
+    SDL_memset(&query, 0x00, sizeof(YULDUZ_QueryInfo));
+    query.WithComponentTypes = components;
+    query.WithComponentCount = src_archetype->StoreCount;
+    query.WithTagTypes       = new_tags;
+    query.WithTagCount       = new_tag_count;
+
     YULDUZ_ArchetypeType dst_archetype_type;
-    if (!YULDUZ_GetArchetypeTypeInECSRegistry(
+    if (!YULDUZ_GenerateArchetypeTypeInECSRegistry(
             registry,
             components, src_archetype->StoreCount,
-            new_tags, src_archetype->TagCount + 1,
+            new_tags, new_tag_count,
             &dst_archetype_type)) {
         SDL_stack_free(components);
         SDL_stack_free(new_tags);
@@ -241,26 +259,24 @@ bool YULDUZ_AddTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Ent
 
     YULDUZ_Archetype *dst_archetype = &registry->Dense[dst_archetype_type];
 
+    YULDUZ_Entity src_moved_entity;
+
     YULDUZ_ArchetypeIndex dst_archetype_index;
     if (!YULDUZ_MoveEntityInArchetype(
-            src_archetype, dst_archetype, nullptr, 0, record.ArchetypeIndex, &dst_archetype_index)) {
+            src_archetype, dst_archetype, nullptr, 0, src_record.ArchetypeIndex, &dst_archetype_index, &src_moved_entity)) {
         SDL_stack_free(components);
         SDL_stack_free(new_tags);
         return false;
     }
 
-    if (record.ArchetypeIndex < src_archetype->DenseCount) {
-        YULDUZ_Entity moved_entity = src_archetype->Dense[record.ArchetypeIndex];
-        if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &moved_entity, &record, 1)) {
-            SDL_stack_free(components);
-            SDL_stack_free(new_tags);
-            return false;
-        }
+    if (YULDUZ_INVALID_ENTITY != src_moved_entity) {
+        YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &src_moved_entity, &src_record, 1);
     }
 
-    record.ArchetypeType  = dst_archetype_type;
-    record.ArchetypeIndex = dst_archetype_index;
-    if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
+    YULDUZ_EntityRecord dst_record = {0};
+    dst_record.ArchetypeType       = dst_archetype_type;
+    dst_record.ArchetypeIndex      = dst_archetype_index;
+    if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &dst_record, 1)) {
         SDL_stack_free(components);
         SDL_stack_free(new_tags);
         return false;
@@ -268,23 +284,24 @@ bool YULDUZ_AddTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Ent
 
     SDL_stack_free(components);
     SDL_stack_free(new_tags);
-
     return true;
 }
 
 bool YULDUZ_RemoveTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type) {
-    YULDUZ_EntityRecord record = {0};
-    if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
+    YULDUZ_EntityRecord src_record = {0};
+    if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &src_record, 1)) {
         return false;
     }
 
-    YULDUZ_Archetype *src_archetype = &registry->Dense[record.ArchetypeType];
+    YULDUZ_Archetype *src_archetype = &registry->Dense[src_record.ArchetypeType];
 
     if (nullptr == YULDUZ_QueryTagInArchetype(src_archetype, tag_type)) {
         return true;
     }
 
-    YULDUZ_Type *new_tags = SDL_stack_alloc(YULDUZ_Type, src_archetype->TagCount - 1);
+    uint32_t new_tag_count = src_archetype->TagCount - 1;
+
+    YULDUZ_Type *new_tags = SDL_stack_alloc(YULDUZ_Type, new_tag_count);
     for (uint32_t i = 0, j = 0; i < src_archetype->TagCount; i++) {
         if (src_archetype->Tags[i] == tag_type) {
             continue;
@@ -299,10 +316,10 @@ bool YULDUZ_RemoveTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_
     }
 
     YULDUZ_ArchetypeType dst_archetype_type;
-    if (!YULDUZ_GetArchetypeTypeInECSRegistry(
+    if (!YULDUZ_GenerateArchetypeTypeInECSRegistry(
             registry,
             components, src_archetype->StoreCount,
-            new_tags, src_archetype->TagCount - 1,
+            new_tags, new_tag_count,
             &dst_archetype_type)) {
         SDL_stack_free(components);
         SDL_stack_free(new_tags);
@@ -311,26 +328,24 @@ bool YULDUZ_RemoveTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_
 
     YULDUZ_Archetype *dst_archetype = &registry->Dense[dst_archetype_type];
 
+    YULDUZ_Entity src_moved_entity;
+
     YULDUZ_ArchetypeIndex dst_archetype_index;
     if (!YULDUZ_MoveEntityInArchetype(
-            src_archetype, dst_archetype, nullptr, 0, record.ArchetypeIndex, &dst_archetype_index)) {
+            src_archetype, dst_archetype, nullptr, 0, src_record.ArchetypeIndex, &dst_archetype_index, &src_moved_entity)) {
         SDL_stack_free(components);
         SDL_stack_free(new_tags);
         return false;
     }
 
-    if (record.ArchetypeIndex < src_archetype->DenseCount) {
-        YULDUZ_Entity moved_entity = src_archetype->Dense[record.ArchetypeIndex];
-        if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &moved_entity, &record, 1)) {
-            SDL_stack_free(components);
-            SDL_stack_free(new_tags);
-            return false;
-        }
+    if (YULDUZ_INVALID_ENTITY != src_moved_entity) {
+        YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &src_moved_entity, &src_record, 1);
     }
 
-    record.ArchetypeType  = dst_archetype_type;
-    record.ArchetypeIndex = dst_archetype_index;
-    if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
+    YULDUZ_EntityRecord dst_record = {0};
+    dst_record.ArchetypeType       = dst_archetype_type;
+    dst_record.ArchetypeIndex      = dst_archetype_index;
+    if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &dst_record, 1)) {
         SDL_stack_free(components);
         SDL_stack_free(new_tags);
         return false;
@@ -338,34 +353,35 @@ bool YULDUZ_RemoveTagWithTypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_
 
     SDL_stack_free(components);
     SDL_stack_free(new_tags);
-
     return true;
 }
 
 bool YULDUZ_AddComponentWithTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type component_type, const void *component_data) {
-    YULDUZ_EntityRecord record = {0};
-    if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
+    YULDUZ_EntityRecord src_record = {0};
+    if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &src_record, 1)) {
         return false;
     }
 
-    YULDUZ_Archetype *src_archetype = &registry->Dense[record.ArchetypeType];
+    YULDUZ_Archetype *src_archetype = &registry->Dense[src_record.ArchetypeType];
 
     if (nullptr != YULDUZ_QueryStoreInArchetype(src_archetype, component_type)) {
         return true;
     }
 
-    YULDUZ_Type *new_components = SDL_stack_alloc(YULDUZ_Type, src_archetype->StoreCount + 1);
+    uint32_t new_component_count = src_archetype->StoreCount + 1;
+
+    YULDUZ_Type *new_components = SDL_stack_alloc(YULDUZ_Type, new_component_count);
     for (uint32_t i = 0; i < src_archetype->StoreCount; i++) {
         new_components[i] = src_archetype->Stores[i].Type;
     }
     new_components[src_archetype->StoreCount] = component_type;
-    YULDUZ_SDL_SortTypes(new_components, src_archetype->StoreCount + 1);
+    YULDUZ_SDL_SortTypes(new_components, new_component_count);
 
     YULDUZ_ArchetypeType dst_archetype_type;
-    if (!YULDUZ_GetArchetypeTypeInECSRegistry(
+    if (!YULDUZ_GenerateArchetypeTypeInECSRegistry(
             registry,
-            new_components, src_archetype->StoreCount + 1,
+            new_components, new_component_count,
             src_archetype->Tags, src_archetype->TagCount,
             &dst_archetype_type)) {
         SDL_stack_free(new_components);
@@ -374,52 +390,52 @@ bool YULDUZ_AddComponentWithTypeInECSRegistry(
 
     YULDUZ_Archetype *dst_archetype = &registry->Dense[dst_archetype_type];
 
-    YULDUZ_DataInfo info = (YULDUZ_DataInfo){
+    YULDUZ_Entity src_moved_entity;
+
+    YULDUZ_TypeDataInfo component_data_info = (YULDUZ_TypeDataInfo){
         .Type = component_type,
         .Data = component_data,
     };
 
     YULDUZ_ArchetypeIndex dst_archetype_index;
     if (!YULDUZ_MoveEntityInArchetype(
-            src_archetype, dst_archetype, &info, 1, record.ArchetypeIndex, &dst_archetype_index)) {
+            src_archetype, dst_archetype, &component_data_info, 1, src_record.ArchetypeIndex, &dst_archetype_index, &src_moved_entity)) {
         SDL_stack_free(new_components);
         return false;
     }
 
-    if (record.ArchetypeIndex < src_archetype->DenseCount) {
-        YULDUZ_Entity moved_entity = src_archetype->Dense[record.ArchetypeIndex];
-        if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &moved_entity, &record, 1)) {
-            SDL_stack_free(new_components);
-            return false;
-        }
+    if (YULDUZ_INVALID_ENTITY != src_moved_entity) {
+        YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &src_moved_entity, &src_record, 1);
     }
 
-    record.ArchetypeType  = dst_archetype_type;
-    record.ArchetypeIndex = dst_archetype_index;
-    if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
+    YULDUZ_EntityRecord dst_record = {0};
+    dst_record.ArchetypeType       = dst_archetype_type;
+    dst_record.ArchetypeIndex      = dst_archetype_index;
+    if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &dst_record, 1)) {
         SDL_stack_free(new_components);
         return false;
     }
 
     SDL_stack_free(new_components);
-
     return true;
 }
 
 bool YULDUZ_RemoveComponentWithTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type component_type) {
-    YULDUZ_EntityRecord record = {0};
-    if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
+    YULDUZ_EntityRecord src_record = {0};
+    if (!YULDUZ_GetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &src_record, 1)) {
         return false;
     }
 
-    YULDUZ_Archetype *src_archetype = &registry->Dense[record.ArchetypeType];
+    YULDUZ_Archetype *src_archetype = &registry->Dense[src_record.ArchetypeType];
 
     if (nullptr == YULDUZ_QueryStoreInArchetype(src_archetype, component_type)) {
         return true;
     }
 
-    YULDUZ_Type *new_components = SDL_stack_alloc(YULDUZ_Type, src_archetype->StoreCount - 1);
+    uint32_t new_component_count = src_archetype->StoreCount - 1;
+
+    YULDUZ_Type *new_components = SDL_stack_alloc(YULDUZ_Type, new_component_count);
     for (uint32_t i = 0, j = 0; i < src_archetype->StoreCount; i++) {
         if (src_archetype->Stores[i].Type == component_type) {
             continue;
@@ -429,9 +445,9 @@ bool YULDUZ_RemoveComponentWithTypeInECSRegistry(
     }
 
     YULDUZ_ArchetypeType dst_archetype_type;
-    if (!YULDUZ_GetArchetypeTypeInECSRegistry(
+    if (!YULDUZ_GenerateArchetypeTypeInECSRegistry(
             registry,
-            new_components, src_archetype->StoreCount - 1,
+            new_components, new_component_count,
             src_archetype->Tags, src_archetype->TagCount,
             &dst_archetype_type)) {
         SDL_stack_free(new_components);
@@ -440,191 +456,136 @@ bool YULDUZ_RemoveComponentWithTypeInECSRegistry(
 
     YULDUZ_Archetype *dst_archetype = &registry->Dense[dst_archetype_type];
 
+    YULDUZ_Entity src_moved_entity;
+
     YULDUZ_ArchetypeIndex dst_archetype_index;
     if (!YULDUZ_MoveEntityInArchetype(
-            src_archetype, dst_archetype, nullptr, 0, record.ArchetypeIndex, &dst_archetype_index)) {
+            src_archetype, dst_archetype, nullptr, 0, src_record.ArchetypeIndex, &dst_archetype_index, &src_moved_entity)) {
         SDL_stack_free(new_components);
         return false;
     }
 
-    if (record.ArchetypeIndex < src_archetype->DenseCount) {
-        YULDUZ_Entity moved_entity = src_archetype->Dense[record.ArchetypeIndex];
-        if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &moved_entity, &record, 1)) {
-            SDL_stack_free(new_components);
-            return false;
-        }
+    if (YULDUZ_INVALID_ENTITY != src_moved_entity) {
+        YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &src_moved_entity, &src_record, 1);
     }
 
-    record.ArchetypeType  = dst_archetype_type;
-    record.ArchetypeIndex = dst_archetype_index;
-    if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &record, 1)) {
+    YULDUZ_EntityRecord dst_record = {0};
+    dst_record.ArchetypeType       = dst_archetype_type;
+    dst_record.ArchetypeIndex      = dst_archetype_index;
+    if (!YULDUZ_SetEntityRecordsInEntityRegistry(&registry->EntityRegistry, &entity, &dst_record, 1)) {
         SDL_stack_free(new_components);
         return false;
     }
 
     SDL_stack_free(new_components);
-
     return true;
 }
 
-YULDUZ_ArchetypeType *YULDUZ_QueryArchetypesInECSRegistry(
-    YULDUZ_ECSRegistry *registry,
-    const YULDUZ_Type *required_component_types, uint32_t required_component_count,
-    const YULDUZ_Type *required_tag_types, uint32_t required_tag_count,
-    uint32_t *archetype_type_count) {
-    uint32_t archetype_capacity = 8;
-    uint32_t archetype_count    = 0;
-
-    YULDUZ_ArchetypeType *archetype_types = SDL_malloc(sizeof(YULDUZ_ArchetypeType) * archetype_capacity);
-
-    for (YULDUZ_ArchetypeType i = 0; i < registry->DenseCount; i++) {
-        YULDUZ_Archetype *archetype = &registry->Dense[i];
-        if (archetype->TagCount < required_tag_count) {
-            continue;
-        }
-        if (archetype->StoreCount < required_component_count) {
-            continue;
-        }
-
-        bool found_required_tags = true;
-        for (uint32_t j = 0; j < required_tag_count; j++) {
-            if (nullptr == YULDUZ_QueryTagInArchetype(archetype, required_tag_types[j])) {
-                found_required_tags = false;
-                break;
-            }
-        }
-        if (!found_required_tags) {
-            continue;
-        }
-
-        bool found_required_components = true;
-        for (uint32_t j = 0; j < required_component_count; j++) {
-            if (nullptr == YULDUZ_QueryStoreInArchetype(archetype, required_component_types[j])) {
-                found_required_components = false;
-                break;
-            }
-        }
-        if (!found_required_components) {
-            continue;
-        }
-
-        if (archetype_count >= archetype_capacity) {
-            archetype_capacity = archetype_capacity * 2;
-            archetype_types    = SDL_realloc(archetype_types, sizeof(YULDUZ_ArchetypeType) * archetype_capacity);
-        }
-
-        archetype_types[archetype_count] = i;
-        archetype_count++;
-    }
-
-    if (archetype_count == 0) {
-        SDL_free(archetype_types);
-        return nullptr;
-    }
-
-    *archetype_type_count = archetype_count;
-    return archetype_types;
+bool YULDUZ_GetArchetypeCountInECSRegistry(const YULDUZ_ECSRegistry *registry, uint32_t *archetype_count) {
+    *archetype_count = registry->DenseCount;
+    return true;
 }
 
-YULDUZ_Archetype *YULDUZ_GetArchetypeInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_ArchetypeType archetype_type) {
-    if (archetype_type >= registry->DenseCount) {
-        return nullptr;
-    }
+YULDUZ_Archetype *YULDUZ_GetArchetypeInECSRegistry(const YULDUZ_ECSRegistry *registry, YULDUZ_ArchetypeType archetype_type) {
     return &registry->Dense[archetype_type];
 }
 
-bool YULDUZ_GetArchetypeTypeInECSRegistry(
+bool YULDUZ_GenerateArchetypeTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry,
     const YULDUZ_Type *component_types, uint32_t component_count,
     const YULDUZ_Type *tag_types, uint32_t tag_count,
     YULDUZ_ArchetypeType *archetype_type) {
     for (YULDUZ_ArchetypeType i = 0; i < registry->DenseCount; i++) {
         YULDUZ_Archetype *archetype = &registry->Dense[i];
-
-        if (archetype->StoreCount != component_count) {
-            continue;
-        }
         if (archetype->TagCount != tag_count) {
             continue;
         }
-
-        bool component_match = true;
-        for (uint32_t j = 0; j < archetype->StoreCount; j++) {
-            if (archetype->Stores[j].Type != component_types[j]) {
-                component_match = false;
-                break;
-            }
-        }
-        if (!component_match) {
+        if (archetype->StoreCount != component_count) {
             continue;
         }
-
-        bool tag_match = true;
-        for (uint32_t j = 0; j < archetype->TagCount; j++) {
+        bool found_tags = true;
+        for (uint32_t j = 0; j < tag_count; j++) {
             if (archetype->Tags[j] != tag_types[j]) {
-                tag_match = false;
+                found_tags = false;
                 break;
             }
         }
-        if (!tag_match) {
+        if (!found_tags) {
             continue;
         }
-
+        bool found_components = true;
+        for (uint32_t j = 0; j < component_count; j++) {
+            if (archetype->Stores[j].Type != component_types[j]) {
+                found_components = false;
+                break;
+            }
+        }
+        if (!found_components) {
+            continue;
+        }
         *archetype_type = i;
         return true;
     }
 
-    if (!YULDUZ_EnsureDenseCapacityInECSRegistry(registry)) {
-        return false;
-    }
+    YULDUZ_TypeInfo *component_type_infos = nullptr;
 
-    YULDUZ_TypeDescription *component_type_descriptions = SDL_stack_alloc(YULDUZ_TypeDescription, component_count);
-    YULDUZ_TypeInfo        *component_type_infos        = SDL_stack_alloc(YULDUZ_TypeInfo, component_count);
+    if (component_count > 0) {
+        YULDUZ_TypeDescription *component_type_descriptions =
+            SDL_stack_alloc(YULDUZ_TypeDescription, component_count);
 
-    if (!YULDUZ_GetTypeDescriptionsInTypeRegistry(
-            &registry->TypeRegistry, component_types, component_type_descriptions, component_count)) {
-        SDL_stack_free(component_type_infos);
+        component_type_infos = SDL_stack_alloc(YULDUZ_TypeInfo, component_count);
+
+        if (!YULDUZ_GetTypeDescriptionsInTypeRegistry(
+                &registry->TypeRegistry, component_types, component_type_descriptions, component_count)) {
+            SDL_stack_free(component_type_infos);
+            SDL_stack_free(component_type_descriptions);
+            return false;
+        }
+
+        for (uint32_t i = 0; i < component_count; i++) {
+            component_type_infos[i].Type      = component_types[i];
+            component_type_infos[i].Size      = component_type_descriptions[i].Size;
+            component_type_infos[i].Alignment = component_type_descriptions[i].Alignment;
+        }
+
         SDL_stack_free(component_type_descriptions);
-        return false;
     }
 
-    for (uint32_t i = 0; i < component_count; i++) {
-        component_type_infos[i].Type      = component_types[i];
-        component_type_infos[i].Size      = component_type_descriptions[i].Size;
-        component_type_infos[i].Alignment = component_type_descriptions[i].Alignment;
-    }
+    YULDUZ_EnsureDenseCapacityInECSRegistry(registry);
 
     YULDUZ_ArchetypeType new_archetype_type = registry->DenseCount;
     registry->DenseCount++;
 
     YULDUZ_Archetype *new_archetype = &registry->Dense[new_archetype_type];
     if (!YULDUZ_InitializeArchetype(
-            new_archetype, component_type_infos, component_count, tag_types, tag_count, registry->InitialArchetypeCapacity)) {
-        SDL_stack_free(component_type_infos);
-        SDL_stack_free(component_type_descriptions);
+            new_archetype,
+            component_type_infos, component_count,
+            tag_types, tag_count,
+            registry->InitialArchetypeCapacity)) {
+        if (component_count > 0) {
+            SDL_stack_free(component_type_infos);
+        }
         return false;
     }
     *archetype_type = new_archetype_type;
-    SDL_stack_free(component_type_infos);
-    SDL_stack_free(component_type_descriptions);
+
+    if (component_count > 0) {
+        SDL_stack_free(component_type_infos);
+    }
+
     return true;
 }
 
-bool YULDUZ_EnsureDenseCapacityInECSRegistry(YULDUZ_ECSRegistry *registry) {
+void YULDUZ_EnsureDenseCapacityInECSRegistry(YULDUZ_ECSRegistry *registry) {
     if (registry->DenseCount < registry->DenseCapacity) {
-        return true;
+        return;
     }
 
     uint32_t old_capacity = registry->DenseCapacity;
     uint32_t new_capacity = old_capacity * 2;
 
     YULDUZ_Archetype *new_dense = SDL_realloc(registry->Dense, sizeof(YULDUZ_Archetype) * new_capacity);
-    if (!new_dense) {
-        return false;
-    }
 
     registry->DenseCapacity = new_capacity;
     registry->Dense         = new_dense;
-
-    return true;
 }

@@ -1,7 +1,7 @@
 #include <Yulduz/Engine/Query.h>
 
-bool YULDUZ_EnsureComponentCapacityInQuery(YULDUZ_Query *query);
-bool YULDUZ_EnsureTagCapacityInQuery(YULDUZ_Query *query);
+void YULDUZ_EnsureComponentCapacityInQuery(YULDUZ_Query *query);
+void YULDUZ_EnsureTagCapacityInQuery(YULDUZ_Query *query);
 
 bool YULDUZ_InitializeQuery(YULDUZ_Query *query, uint32_t initial_component_capacity, uint32_t initial_tag_capacity) {
     SDL_zerop(query);
@@ -31,9 +31,7 @@ void YULDUZ_ReleaseQuery(YULDUZ_Query *query) {
 }
 
 bool YULDUZ_SetQueryWithComponentType(YULDUZ_Query *query, YULDUZ_Type component_type, YULDUZ_QueryAccessType access_type) {
-    if (!YULDUZ_EnsureComponentCapacityInQuery(query)) {
-        return false;
-    }
+    YULDUZ_EnsureComponentCapacityInQuery(query);
 
     uint32_t new_component = query->RequiredComponentCount;
     query->RequiredComponentCount++;
@@ -47,9 +45,7 @@ bool YULDUZ_SetQueryWithComponentType(YULDUZ_Query *query, YULDUZ_Type component
 }
 
 bool YULDUZ_SetQueryWithTagType(YULDUZ_Query *query, YULDUZ_Type tag_type) {
-    if (!YULDUZ_EnsureTagCapacityInQuery(query)) {
-        return false;
-    }
+    YULDUZ_EnsureTagCapacityInQuery(query);
 
     uint32_t new_tag = query->RequiredTagCount;
     query->RequiredTagCount++;
@@ -91,9 +87,58 @@ bool YULDUZ_DeepCopyQuery(const YULDUZ_Query *src_query, YULDUZ_Query *dst_query
     return true;
 }
 
-bool YULDUZ_EnsureComponentCapacityInQuery(YULDUZ_Query *query) {
+bool YULDUZ_CreateQueryInfo(const YULDUZ_Query *query, YULDUZ_QueryInfo *info) {
+    SDL_zerop(info);
+
+    info->WithComponentCount = query->RequiredComponentCount;
+    info->WithComponentTypes = nullptr;
+    if (info->WithComponentCount > 0) {
+        info->WithComponentTypes = SDL_malloc(sizeof(YULDUZ_Type) * info->WithComponentCount);
+        SDL_memcpy(
+            info->WithComponentTypes, query->SortedRequiredComponentTypes, sizeof(YULDUZ_Type) * info->WithComponentCount);
+    }
+
+    info->WithTagCount = query->RequiredTagCount;
+    info->WithTagTypes = nullptr;
+    if (info->WithTagCount > 0) {
+        info->WithTagTypes = SDL_malloc(sizeof(YULDUZ_Type) * info->WithTagCount);
+        SDL_memcpy(info->WithTagTypes, query->SortedRequiredTagTypes, sizeof(YULDUZ_Type) * info->WithTagCount);
+    }
+
+    return true;
+}
+
+void YULDUZ_DestroyQueryInfo(YULDUZ_QueryInfo *info) {
+    SDL_free(info->WithComponentTypes);
+    SDL_free(info->WithTagTypes);
+
+    SDL_zerop(info);
+}
+
+bool YULDUZ_ArchetypeSupportsQueryInfo(const YULDUZ_QueryInfo *query, const YULDUZ_Archetype *archetype) {
+    if (archetype->TagCount < query->WithTagCount) {
+        return false;
+    }
+    if (archetype->StoreCount < query->WithComponentCount) {
+        return false;
+    }
+    for (uint32_t i = 0; i < query->WithTagCount; i++) {
+        if (nullptr == YULDUZ_QueryTagInArchetype(archetype, query->WithTagTypes[i])) {
+            return false;
+        }
+    }
+    for (uint32_t i = 0; i < query->WithComponentCount; i++) {
+        if (nullptr == YULDUZ_QueryStoreInArchetype(archetype, query->WithComponentTypes[i])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void YULDUZ_EnsureComponentCapacityInQuery(YULDUZ_Query *query) {
     if (query->RequiredComponentCount < query->RequiredComponentCapacity) {
-        return true;
+        return;
     }
     uint32_t old_capacity = query->RequiredComponentCapacity;
     uint32_t new_capacity = old_capacity * 2;
@@ -109,13 +154,11 @@ bool YULDUZ_EnsureComponentCapacityInQuery(YULDUZ_Query *query) {
     query->RequiredComponentAccessTypes = new_access_types;
     query->RequiredComponentTypes       = new_component_types;
     query->SortedRequiredComponentTypes = new_sorted_component_types;
-
-    return true;
 }
 
-bool YULDUZ_EnsureTagCapacityInQuery(YULDUZ_Query *query) {
+void YULDUZ_EnsureTagCapacityInQuery(YULDUZ_Query *query) {
     if (query->RequiredTagCount < query->RequiredTagCapacity) {
-        return true;
+        return;
     }
 
     uint32_t old_capacity = query->RequiredTagCapacity;
@@ -127,6 +170,4 @@ bool YULDUZ_EnsureTagCapacityInQuery(YULDUZ_Query *query) {
     query->RequiredTagCapacity    = new_capacity;
     query->RequiredTagTypes       = new_tag_types;
     query->SortedRequiredTagTypes = new_sorted_tag_types;
-
-    return true;
 }

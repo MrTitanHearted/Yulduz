@@ -49,5 +49,5 @@ void YULDUZ_Assert(
     g_pfnAssert(g_UserData, &entry);
     va_end(entry.FormatArguments);
 
-    abort();
+    exit(-1);
 }

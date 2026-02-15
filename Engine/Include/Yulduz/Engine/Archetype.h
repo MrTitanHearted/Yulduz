@@ -31,21 +31,23 @@ YULDUZ_API void YULDUZ_ReleaseArchetype(YULDUZ_Archetype *archetype);
 // type datas must be sorted according to their type ids
 YULDUZ_API bool YULDUZ_AddInArchetype(
     YULDUZ_Archetype *archetype, YULDUZ_Entity entity,
-    const YULDUZ_DataInfo *component_data, YULDUZ_ArchetypeIndex *index);
+    const YULDUZ_TypeDataInfo *component_data, YULDUZ_ArchetypeIndex *index);
 YULDUZ_API bool YULDUZ_RemoveInArchetype(
-    YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index);
+    YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index, YULDUZ_Entity *moved_entity);
 
+YULDUZ_API bool YULDUZ_SetEntityInArchetype(
+    const YULDUZ_Archetype *archetype, YULDUZ_Entity entity, YULDUZ_ArchetypeIndex index);
+
+// type datas must be sorted according to their type ids
 YULDUZ_API bool YULDUZ_MoveEntityInArchetype(
     YULDUZ_Archetype *src, YULDUZ_Archetype *dst,
-    const YULDUZ_DataInfo *component_data, uint32_t component_count,
-    YULDUZ_ArchetypeIndex src_index, YULDUZ_ArchetypeIndex *dst_index);
+    const YULDUZ_TypeDataInfo *component_data, uint32_t component_count,
+    YULDUZ_ArchetypeIndex src_index, YULDUZ_ArchetypeIndex *dst_index,
+    YULDUZ_Entity *src_moved_entity);
 
-YULDUZ_API YULDUZ_Type *YULDUZ_QueryTagInArchetype(YULDUZ_Archetype *archetype, YULDUZ_Type tag);
+YULDUZ_API YULDUZ_Type *YULDUZ_QueryTagInArchetype(const YULDUZ_Archetype *archetype, YULDUZ_Type tag_type);
 
-YULDUZ_API YULDUZ_ComponentStore *YULDUZ_QueryStoreInArchetype(YULDUZ_Archetype *archetype, YULDUZ_Type type);
+YULDUZ_API YULDUZ_ComponentStore *YULDUZ_QueryStoreInArchetype(const YULDUZ_Archetype *archetype, YULDUZ_Type component_type);
 
-YULDUZ_API bool YULDUZ_QueryStoresInArchetype(
-    YULDUZ_Archetype  *archetype,
-    const YULDUZ_Type *component_types, uint32_t component_count,
-    const YULDUZ_Type *tags, uint32_t tag_count,
-    YULDUZ_ComponentStore **stores);
+// Unsafe index!
+YULDUZ_API YULDUZ_Entity YULDUZ_GetEntityInArchetype(const YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index);
