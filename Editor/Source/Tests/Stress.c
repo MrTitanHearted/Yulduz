@@ -195,11 +195,11 @@ void stress_test_many_archetypes(void) {
         }
 
         if (i & 16) {
-            YULDUZ_AddTagInECSRegistry(&ecs, e, "Player");
+            YULDUZ_AddComponentInECSRegistry(&ecs, e, "Player", nullptr);
         }
 
         if (i & 32) {
-            YULDUZ_AddTagInECSRegistry(&ecs, e, "Enemy");
+            YULDUZ_AddComponentInECSRegistry(&ecs, e, "Enemy", nullptr);
         }
     }
 
@@ -418,16 +418,16 @@ void stress_test_random_operations(void) {
                     YULDUZ_RemoveComponentInECSRegistry(&ecs, e, "Velocity");
                     break;
                 case 4:
-                    YULDUZ_AddTagInECSRegistry(&ecs, e, "Player");
+                    YULDUZ_AddComponentInECSRegistry(&ecs, e, "Player", nullptr);
                     break;
                 case 5:
-                    YULDUZ_AddTagInECSRegistry(&ecs, e, "Enemy");
+                    YULDUZ_AddComponentInECSRegistry(&ecs, e, "Enemy", nullptr);
                     break;
                 case 6:
-                    YULDUZ_RemoveTagInECSRegistry(&ecs, e, "Player");
+                    YULDUZ_RemoveComponentInECSRegistry(&ecs, e, "Player");
                     break;
                 case 7:
-                    YULDUZ_RemoveTagInECSRegistry(&ecs, e, "Enemy");
+                    YULDUZ_RemoveComponentInECSRegistry(&ecs, e, "Enemy");
                     break;
             }
         }

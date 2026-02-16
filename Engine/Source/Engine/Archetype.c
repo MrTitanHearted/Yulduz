@@ -136,7 +136,7 @@ bool YULDUZ_MoveEntityInArchetype(
     if (src_last_index != src_index) {
         src->Dense[src_index] = src->Dense[src_last_index];
 
-        *src_moved_entity = src->Dense[src_index];
+        *src_moved_entity = src->Dense[src_last_index];
 
         for (uint32_t i = 0; i < src->StoreCount; i++) {
             YULDUZ_CopyBackComponentInComponentStore(&src->Stores[i], src_index, src_last_index);

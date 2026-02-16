@@ -25,13 +25,12 @@ void run_all_ecs_registry_tests(void) {
 void test_ecs_null_archetype(void) {
     TEST_START("ECS Null Archetype");
 
-    YULDUZ_ECSRegistry ecs = {0};
+    YULDUZ_ECSRegistry               ecs  = {0};
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialTypeCapacity = 8,
-        .InitialEntityCapacity = 16,
-        .InitialArchetypeCapacity = 8,
-        .InitialArchetypeTypeCapacity = 8
-    };
+        .InitialTypeCapacity          = 8,
+        .InitialEntityCapacity        = 16,
+        .InitialArchetypeCapacity     = 8,
+        .InitialArchetypeTypeCapacity = 8};
 
     YULDUZ_ASSERT(YULDUZ_InitializeECSRegistry(&ecs, info),
                   "Failed to initialize ECS registry");
@@ -51,7 +50,7 @@ void test_ecs_null_archetype(void) {
     YULDUZ_ASSERT(entity != YULDUZ_INVALID_ENTITY, "Entity should be valid");
 
     // Entity should not have any components or tags
-    YULDUZ_ASSERT(!YULDUZ_HasTagInECSRegistry(&ecs, entity, "Player"),
+    YULDUZ_ASSERT(!YULDUZ_GetComponentInECSRegistry(&ecs, entity, "Player", nullptr),
                   "New entity should not have Player tag");
 
     YULDUZ_ReleaseECSRegistry(&ecs);
@@ -62,13 +61,12 @@ void test_ecs_null_archetype(void) {
 void test_ecs_entity_lifecycle(void) {
     TEST_START("ECS Entity Lifecycle");
 
-    YULDUZ_ECSRegistry ecs = {0};
+    YULDUZ_ECSRegistry               ecs  = {0};
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialTypeCapacity = 8,
-        .InitialEntityCapacity = 16,
-        .InitialArchetypeCapacity = 8,
-        .InitialArchetypeTypeCapacity = 8
-    };
+        .InitialTypeCapacity          = 8,
+        .InitialEntityCapacity        = 16,
+        .InitialArchetypeCapacity     = 8,
+        .InitialArchetypeTypeCapacity = 8};
 
     YULDUZ_ASSERT(YULDUZ_InitializeECSRegistry(&ecs, info),
                   "Failed to initialize ECS");
@@ -87,8 +85,8 @@ void test_ecs_entity_lifecycle(void) {
                   "Failed to destroy entity");
 
     // Try to operate on destroyed entity - should fail
-    Position pos = {1.0f, 2.0f, 3.0f};
-    bool result = YULDUZ_AddComponentInECSRegistry(&ecs, entity, "Position", &pos);
+    Position pos    = {1.0f, 2.0f, 3.0f};
+    bool     result = YULDUZ_AddComponentInECSRegistry(&ecs, entity, "Position", &pos);
     YULDUZ_ASSERT(!result, "Should not be able to add component to destroyed entity");
 
     YULDUZ_ReleaseECSRegistry(&ecs);
@@ -99,13 +97,12 @@ void test_ecs_entity_lifecycle(void) {
 void test_ecs_add_remove_components(void) {
     TEST_START("ECS Add/Remove Components");
 
-    YULDUZ_ECSRegistry ecs = {0};
+    YULDUZ_ECSRegistry               ecs  = {0};
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialTypeCapacity = 8,
-        .InitialEntityCapacity = 16,
-        .InitialArchetypeCapacity = 8,
-        .InitialArchetypeTypeCapacity = 8
-    };
+        .InitialTypeCapacity          = 8,
+        .InitialEntityCapacity        = 16,
+        .InitialArchetypeCapacity     = 8,
+        .InitialArchetypeTypeCapacity = 8};
 
     YULDUZ_ASSERT(YULDUZ_InitializeECSRegistry(&ecs, info),
                   "Failed to initialize ECS");
@@ -163,13 +160,12 @@ void test_ecs_add_remove_components(void) {
 void test_ecs_add_remove_tags(void) {
     TEST_START("ECS Add/Remove Tags");
 
-    YULDUZ_ECSRegistry ecs = {0};
+    YULDUZ_ECSRegistry               ecs  = {0};
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialTypeCapacity = 8,
-        .InitialEntityCapacity = 16,
-        .InitialArchetypeCapacity = 8,
-        .InitialArchetypeTypeCapacity = 8
-    };
+        .InitialTypeCapacity          = 8,
+        .InitialEntityCapacity        = 16,
+        .InitialArchetypeCapacity     = 8,
+        .InitialArchetypeTypeCapacity = 8};
 
     YULDUZ_ASSERT(YULDUZ_InitializeECSRegistry(&ecs, info),
                   "Failed to initialize ECS");
@@ -181,28 +177,28 @@ void test_ecs_add_remove_tags(void) {
                   "Failed to create entity");
 
     // Add Player tag
-    YULDUZ_ASSERT(YULDUZ_AddTagInECSRegistry(&ecs, entity, "Player"),
+    YULDUZ_ASSERT(YULDUZ_AddComponentInECSRegistry(&ecs, entity, "Player", nullptr),
                   "Failed to add Player tag");
 
-    YULDUZ_ASSERT(YULDUZ_HasTagInECSRegistry(&ecs, entity, "Player"),
+    YULDUZ_ASSERT(YULDUZ_GetComponentInECSRegistry(&ecs, entity, "Player", nullptr),
                   "Entity should have Player tag");
 
     // Add Enemy tag
-    YULDUZ_ASSERT(YULDUZ_AddTagInECSRegistry(&ecs, entity, "Enemy"),
+    YULDUZ_ASSERT(YULDUZ_AddComponentInECSRegistry(&ecs, entity, "Enemy", nullptr),
                   "Failed to add Enemy tag");
 
-    YULDUZ_ASSERT(YULDUZ_HasTagInECSRegistry(&ecs, entity, "Player"),
+    YULDUZ_ASSERT(YULDUZ_GetComponentInECSRegistry(&ecs, entity, "Player", nullptr),
                   "Player tag should still exist");
-    YULDUZ_ASSERT(YULDUZ_HasTagInECSRegistry(&ecs, entity, "Enemy"),
+    YULDUZ_ASSERT(YULDUZ_GetComponentInECSRegistry(&ecs, entity, "Enemy", nullptr),
                   "Enemy tag should exist");
 
     // Remove Player tag
-    YULDUZ_ASSERT(YULDUZ_RemoveTagInECSRegistry(&ecs, entity, "Player"),
+    YULDUZ_ASSERT(YULDUZ_RemoveComponentInECSRegistry(&ecs, entity, "Player"),
                   "Failed to remove Player tag");
 
-    YULDUZ_ASSERT(!YULDUZ_HasTagInECSRegistry(&ecs, entity, "Player"),
+    YULDUZ_ASSERT(!YULDUZ_GetComponentInECSRegistry(&ecs, entity, "Player", nullptr),
                   "Player tag should not exist after removal");
-    YULDUZ_ASSERT(YULDUZ_HasTagInECSRegistry(&ecs, entity, "Enemy"),
+    YULDUZ_ASSERT(YULDUZ_GetComponentInECSRegistry(&ecs, entity, "Enemy", nullptr),
                   "Enemy tag should still exist");
 
     YULDUZ_ReleaseECSRegistry(&ecs);
@@ -213,13 +209,12 @@ void test_ecs_add_remove_tags(void) {
 void test_ecs_set_get_components(void) {
     TEST_START("ECS Set/Get Components");
 
-    YULDUZ_ECSRegistry ecs = {0};
+    YULDUZ_ECSRegistry               ecs  = {0};
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialTypeCapacity = 8,
-        .InitialEntityCapacity = 16,
-        .InitialArchetypeCapacity = 8,
-        .InitialArchetypeTypeCapacity = 8
-    };
+        .InitialTypeCapacity          = 8,
+        .InitialEntityCapacity        = 16,
+        .InitialArchetypeCapacity     = 8,
+        .InitialArchetypeTypeCapacity = 8};
 
     YULDUZ_ASSERT(YULDUZ_InitializeECSRegistry(&ecs, info),
                   "Failed to initialize ECS");
@@ -250,7 +245,7 @@ void test_ecs_set_get_components(void) {
 
     // Try to set component that doesn't exist - should fail
     Health health = {100.0f, 100.0f};
-    bool result = YULDUZ_SetComponentInECSRegistry(&ecs, entity, "Health", &health);
+    bool   result = YULDUZ_SetComponentInECSRegistry(&ecs, entity, "Health", &health);
     YULDUZ_ASSERT(!result, "Setting non-existent component should fail");
 
     YULDUZ_ReleaseECSRegistry(&ecs);
@@ -261,13 +256,12 @@ void test_ecs_set_get_components(void) {
 void test_ecs_archetype_transitions(void) {
     TEST_START("ECS Archetype Transitions");
 
-    YULDUZ_ECSRegistry ecs = {0};
+    YULDUZ_ECSRegistry               ecs  = {0};
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialTypeCapacity = 8,
-        .InitialEntityCapacity = 16,
-        .InitialArchetypeCapacity = 8,
-        .InitialArchetypeTypeCapacity = 8
-    };
+        .InitialTypeCapacity          = 8,
+        .InitialEntityCapacity        = 16,
+        .InitialArchetypeCapacity     = 8,
+        .InitialArchetypeTypeCapacity = 8};
 
     YULDUZ_ASSERT(YULDUZ_InitializeECSRegistry(&ecs, info),
                   "Failed to initialize ECS");
@@ -297,7 +291,7 @@ void test_ecs_archetype_transitions(void) {
     // Verify all components exist
     Position check_pos;
     Velocity check_vel;
-    Health check_health;
+    Health   check_health;
 
     YULDUZ_ASSERT(YULDUZ_GetComponentInECSRegistry(&ecs, entity, "Position", &check_pos),
                   "Position should exist");
@@ -333,13 +327,12 @@ void test_ecs_archetype_transitions(void) {
 void test_ecs_archetype_creation(void) {
     TEST_START("ECS Archetype Creation and Reuse");
 
-    YULDUZ_ECSRegistry ecs = {0};
+    YULDUZ_ECSRegistry               ecs  = {0};
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialTypeCapacity = 8,
-        .InitialEntityCapacity = 16,
-        .InitialArchetypeCapacity = 4,
-        .InitialArchetypeTypeCapacity = 4
-    };
+        .InitialTypeCapacity          = 8,
+        .InitialEntityCapacity        = 16,
+        .InitialArchetypeCapacity     = 4,
+        .InitialArchetypeTypeCapacity = 4};
 
     YULDUZ_ASSERT(YULDUZ_InitializeECSRegistry(&ecs, info),
                   "Failed to initialize ECS");
@@ -479,13 +472,12 @@ void test_ecs_query_archetypes(void) {
 void test_ecs_complex_scenarios(void) {
     TEST_START("ECS Complex Scenarios");
 
-    YULDUZ_ECSRegistry ecs = {0};
+    YULDUZ_ECSRegistry               ecs  = {0};
     YULDUZ_ECSRegistryInitializeInfo info = {
-        .InitialTypeCapacity = 16,
-        .InitialEntityCapacity = 32,
-        .InitialArchetypeCapacity = 16,
-        .InitialArchetypeTypeCapacity = 16
-    };
+        .InitialTypeCapacity          = 16,
+        .InitialEntityCapacity        = 32,
+        .InitialArchetypeCapacity     = 16,
+        .InitialArchetypeTypeCapacity = 16};
 
     YULDUZ_ASSERT(YULDUZ_InitializeECSRegistry(&ecs, info),
                   "Failed to initialize ECS");
@@ -494,7 +486,7 @@ void test_ecs_complex_scenarios(void) {
 
     // Scenario: Create multiple entities, add/remove components, verify data integrity
     const uint32_t entity_count = 10;
-    YULDUZ_Entity entities[entity_count];
+    YULDUZ_Entity  entities[entity_count];
 
     // Create entities
     for (uint32_t i = 0; i < entity_count; i++) {
@@ -521,7 +513,7 @@ void test_ecs_complex_scenarios(void) {
 
     // Add tags to entities 0-4
     for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_AddTagInECSRegistry(&ecs, entities[i], "Player");
+        YULDUZ_AddComponentInECSRegistry(&ecs, entities[i], "Player", nullptr);
     }
 
     // Verify all data
@@ -542,7 +534,7 @@ void test_ecs_complex_scenarios(void) {
         }
 
         if (i < 5) {
-            YULDUZ_ASSERT(YULDUZ_HasTagInECSRegistry(&ecs, entities[i], "Player"),
+            YULDUZ_ASSERT(YULDUZ_GetComponentInECSRegistry(&ecs, entities[i], "Player", nullptr),
                           "Entity %u should have Player tag", i);
         }
     }

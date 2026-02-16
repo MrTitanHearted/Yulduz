@@ -8,7 +8,7 @@ bool YULDUZ_InitializeEntityRegistry(YULDUZ_EntityRegistry *registry, uint32_t i
 
     registry->SparseCapacity = initial_capacity;
     registry->Sparse         = SDL_malloc(sizeof(YULDUZ_EntityRecord) * initial_capacity);
-    SDL_memset(registry->Sparse, 0x00, sizeof(YULDUZ_EntityRecord) * initial_capacity);
+    SDL_memset(registry->Sparse, 0xFF, sizeof(YULDUZ_EntityRecord) * initial_capacity);
 
     registry->FreeListCapacity = initial_capacity;
     registry->FreeListCount    = 0;
