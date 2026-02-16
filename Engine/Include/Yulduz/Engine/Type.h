@@ -21,6 +21,10 @@ struct YULDUZ_TypeRegistry {
 
     uint32_t DenseCapacity;
     uint32_t DenseCount;
+
+    SDL_PropertiesID HashMap;
+
+    uint32_t _yulduz_padding;
 };
 
 struct YULDUZ_TypeDataInfo {
@@ -38,7 +42,7 @@ struct YULDUZ_TypeInfo {
     uint32_t Alignment;
 };
 
-constexpr YULDUZ_Type YULDUZ_INVALID_COMPONENT_TYPE = 0xFFFFFFFF;
+constexpr YULDUZ_Type YULDUZ_INVALID_TYPE = 0xFFFFFFFF;
 
 #define YULDUZ_NULL_TYPE_DESCRIPTION \
     (YULDUZ_TypeDescription) {       \
@@ -48,14 +52,14 @@ constexpr YULDUZ_Type YULDUZ_INVALID_COMPONENT_TYPE = 0xFFFFFFFF;
     }
 #define YULDUZ_NULL_TYPE_INFO                       \
     (YULDUZ_TypeInfo) {                             \
-        .Type      = YULDUZ_INVALID_COMPONENT_TYPE, \
+        .Type      = YULDUZ_INVALID_TYPE, \
         .Size      = 0,                             \
         .Alignment = 0,                             \
     }
 
 #define YULDUZ_NULL_TYPE_DATA_INFO             \
     (YULDUZ_TypeDataInfo) {                    \
-        .Type = YULDUZ_INVALID_COMPONENT_TYPE, \
+        .Type = YULDUZ_INVALID_TYPE, \
         .Data = nullptr,                       \
     }
 

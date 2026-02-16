@@ -24,12 +24,16 @@ bool YULDUZ_InitializeECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_ECSRegist
     }
 
     registry->DenseCapacity = initial_archetype_capacity;
-    registry->DenseCount    = 0;
+    registry->DenseCount    = 1;
     registry->Dense         = SDL_malloc(sizeof(YULDUZ_Archetype) * initial_archetype_type_capacity);
 
     registry->InitialArchetypeCapacity = initial_archetype_capacity;
 
-    return YULDUZ_GenerateArchetypeTypeInECSRegistry(registry, nullptr, 0, nullptr, 0, &registry->NullArchetypeType);
+    registry->NullArchetypeType = 0;
+
+    YULDUZ_Archetype *new_archetype = &registry->Dense[registry->NullArchetypeType];
+
+    return YULDUZ_InitializeArchetype(new_archetype, nullptr, 0, nullptr, 0, initial_archetype_capacity);
 }
 
 void YULDUZ_ReleaseECSRegistry(YULDUZ_ECSRegistry *registry) {
@@ -488,6 +492,15 @@ bool YULDUZ_GetArchetypeCountInECSRegistry(const YULDUZ_ECSRegistry *registry, u
 
 YULDUZ_Archetype *YULDUZ_GetArchetypeInECSRegistry(const YULDUZ_ECSRegistry *registry, YULDUZ_ArchetypeType archetype_type) {
     return &registry->Dense[archetype_type];
+}
+
+YULDUZ_ComponentStore *YULDUZ_QueryArchetypeStoreInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, const YULDUZ_Archetype *archetype, const char *component_name) {
+    YULDUZ_Type component_type;
+    if (!YULDUZ_GetTypesInTypeRegistry(&registry->TypeRegistry, &component_name, &component_type, 1)) {
+        return nullptr;
+    }
+    return YULDUZ_QueryStoreInArchetype(archetype, component_type);
 }
 
 bool YULDUZ_GenerateArchetypeTypeInECSRegistry(

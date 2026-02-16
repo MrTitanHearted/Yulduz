@@ -34,7 +34,7 @@ void test_type_registry_basic(void) {
     YULDUZ_ASSERT(YULDUZ_RegisterTypesInTypeRegistry(&registry, &position_desc, &position_type, 1),
                   "Failed to register Position type");
 
-    YULDUZ_ASSERT(position_type != YULDUZ_INVALID_COMPONENT_TYPE,
+    YULDUZ_ASSERT(position_type != YULDUZ_INVALID_TYPE,
                   "Position type should be valid");
     YULDUZ_ASSERT(registry.DenseCount == 1, "Registry should have 1 type");
 
@@ -89,7 +89,7 @@ void test_type_registry_batch_registration(void) {
 
     // Verify all types are valid and unique
     for (uint32_t i = 0; i < 4; i++) {
-        YULDUZ_ASSERT(types[i] != YULDUZ_INVALID_COMPONENT_TYPE,
+        YULDUZ_ASSERT(types[i] != YULDUZ_INVALID_TYPE,
                       "Type %u should be valid", i);
 
         for (uint32_t j = i + 1; j < 4; j++) {

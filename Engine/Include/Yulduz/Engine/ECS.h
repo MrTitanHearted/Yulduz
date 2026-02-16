@@ -95,3 +95,6 @@ YULDUZ_API bool YULDUZ_GetArchetypeCountInECSRegistry(
 // Unsafe index!
 YULDUZ_API YULDUZ_Archetype *YULDUZ_GetArchetypeInECSRegistry(
     const YULDUZ_ECSRegistry *registry, YULDUZ_ArchetypeType archetype_type);
+
+YULDUZ_API YULDUZ_ComponentStore *YULDUZ_QueryArchetypeStoreInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, const YULDUZ_Archetype *archetype, const char *component_name);

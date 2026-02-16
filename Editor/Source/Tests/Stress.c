@@ -4,18 +4,18 @@
 // GLOBAL TYPE VARIABLES - Implementation
 // ============================================================================
 
-YULDUZ_Type g_position_type  = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_velocity_type  = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_health_type    = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_damage_type    = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_name_type      = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_sprite_type    = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_transform_type = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_tag_player     = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_tag_enemy      = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_tag_dead       = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_tag_active     = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_tag_inactive   = YULDUZ_INVALID_COMPONENT_TYPE;
+YULDUZ_Type g_position_type  = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_velocity_type  = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_health_type    = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_damage_type    = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_name_type      = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_sprite_type    = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_transform_type = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_tag_player     = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_tag_enemy      = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_tag_dead       = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_tag_active     = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_tag_inactive   = YULDUZ_INVALID_TYPE;
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -65,18 +65,18 @@ void setup_test_types(YULDUZ_TypeRegistry *registry) {
 
 void cleanup_test_types(void) {
     // Reset to invalid
-    g_position_type  = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_velocity_type  = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_health_type    = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_damage_type    = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_name_type      = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_sprite_type    = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_transform_type = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_tag_player     = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_tag_enemy      = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_tag_dead       = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_tag_active     = YULDUZ_INVALID_COMPONENT_TYPE;
-    g_tag_inactive   = YULDUZ_INVALID_COMPONENT_TYPE;
+    g_position_type  = YULDUZ_INVALID_TYPE;
+    g_velocity_type  = YULDUZ_INVALID_TYPE;
+    g_health_type    = YULDUZ_INVALID_TYPE;
+    g_damage_type    = YULDUZ_INVALID_TYPE;
+    g_name_type      = YULDUZ_INVALID_TYPE;
+    g_sprite_type    = YULDUZ_INVALID_TYPE;
+    g_transform_type = YULDUZ_INVALID_TYPE;
+    g_tag_player     = YULDUZ_INVALID_TYPE;
+    g_tag_enemy      = YULDUZ_INVALID_TYPE;
+    g_tag_dead       = YULDUZ_INVALID_TYPE;
+    g_tag_active     = YULDUZ_INVALID_TYPE;
+    g_tag_inactive   = YULDUZ_INVALID_TYPE;
 }
 
 // ============================================================================

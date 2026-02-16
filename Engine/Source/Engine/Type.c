@@ -9,10 +9,17 @@ bool YULDUZ_InitializeTypeRegistry(YULDUZ_TypeRegistry *registry, uint32_t initi
     registry->DenseCount    = 0;
     registry->Dense         = SDL_malloc(sizeof(YULDUZ_TypeDescription) * registry->DenseCapacity);
 
+    registry->HashMap = SDL_CreateProperties();
+
+    if (0 == registry->HashMap) {
+        return false;
+    }
+
     return true;
 }
 
 void YULDUZ_ReleaseTypeRegistry(YULDUZ_TypeRegistry *registry) {
+    SDL_DestroyProperties(registry->HashMap);
     for (uint32_t i = 0; i < registry->DenseCount; i++) {
         SDL_free(registry->Dense[i].Name);
     }
@@ -27,7 +34,14 @@ bool YULDUZ_RegisterTypesInTypeRegistry(
     YULDUZ_NULLABLE YULDUZ_Type *types, uint32_t type_count) {
     YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(registry, type_count);
 
+    bool registered_all = true;
     for (uint32_t j = 0; j < type_count; j++) {
+        if (YULDUZ_INVALID_TYPE != SDL_GetNumberProperty(registry->HashMap, type_descriptions[j].Name, YULDUZ_INVALID_TYPE)) {
+            DYULDUZ_LOG_ENGINE_WARN("Type with name '%s' already exists", type_descriptions[j].Name);
+            registered_all = false;
+            continue;
+        }
+
         uint32_t index = registry->DenseCount;
         registry->DenseCount++;
 
@@ -35,11 +49,13 @@ bool YULDUZ_RegisterTypesInTypeRegistry(
         registry->Dense[index].Size      = type_descriptions[j].Size;
         registry->Dense[index].Alignment = type_descriptions[j].Alignment;
 
+        SDL_SetNumberProperty(registry->HashMap, registry->Dense[index].Name, index);
+
         if (nullptr != types)
             types[j] = index;
     }
 
-    return true;
+    return registered_all;
 }
 
 bool YULDUZ_GetTypesInTypeRegistry(
@@ -47,18 +63,11 @@ bool YULDUZ_GetTypesInTypeRegistry(
     bool found_all = true;
 
     for (uint32_t j = 0; j < type_count; j++) {
-        types[j] = YULDUZ_INVALID_COMPONENT_TYPE;
+        types[j] = YULDUZ_INVALID_TYPE;
 
-        bool found_j = false;
-        for (uint32_t i = 0; i < registry->DenseCount; i++) {
-            if (0 == SDL_strcmp(registry->Dense[i].Name, type_names[j])) {
-                types[j] = i;
-                found_j  = true;
-                break;
-            }
-        }
+        types[j] = SDL_GetNumberProperty(registry->HashMap, type_names[j], YULDUZ_INVALID_TYPE);
 
-        found_all = found_all && found_j;
+        found_all = found_all && YULDUZ_INVALID_TYPE != types[j];
     }
 
     return found_all;
@@ -71,20 +80,16 @@ bool YULDUZ_GetTypeInfosInTypeRegistry(
     for (uint32_t j = 0; j < type_count; j++) {
         type_infos[j] = YULDUZ_NULL_TYPE_INFO;
 
-        bool found_j = false;
-        for (uint32_t i = 0; i < registry->DenseCount; i++) {
-            YULDUZ_TypeDescription *description = &registry->Dense[i];
-            if (0 == SDL_strcmp(description->Name, type_names[j])) {
-                type_infos[j].Type      = i;
-                type_infos[j].Size      = description->Size;
-                type_infos[j].Alignment = description->Alignment;
+        YULDUZ_Type type = SDL_GetNumberProperty(registry->HashMap, type_names[j], YULDUZ_INVALID_TYPE);
 
-                found_j = true;
-                break;
-            }
+        if (YULDUZ_INVALID_TYPE == type) {
+            found_all = false;
+            continue;
         }
 
-        found_all = found_all && found_j;
+        type_infos[j].Type      = type;
+        type_infos[j].Size      = registry->Dense[type].Size;
+        type_infos[j].Alignment = registry->Dense[type].Alignment;
     }
 
     return found_all;

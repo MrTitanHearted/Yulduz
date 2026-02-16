@@ -26,14 +26,14 @@ void AssertFN(void *user_data, YULDUZ_AssertEntry *entry);
 void LogFN(YULDUZ_Logger *logger, YULDUZ_LogEntry *entry);
 
 // Global component types
-YULDUZ_Type g_position_type = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_velocity_type = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_health_type   = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_damage_type   = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_name_type     = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_tag_player    = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_tag_enemy     = YULDUZ_INVALID_COMPONENT_TYPE;
-YULDUZ_Type g_tag_dead      = YULDUZ_INVALID_COMPONENT_TYPE;
+YULDUZ_Type g_position_type = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_velocity_type = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_health_type   = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_damage_type   = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_name_type     = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_tag_player    = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_tag_enemy     = YULDUZ_INVALID_TYPE;
+YULDUZ_Type g_tag_dead      = YULDUZ_INVALID_TYPE;
 
 // Test functions
 void setup_component_registry(YULDUZ_TypeRegistry *registry);
