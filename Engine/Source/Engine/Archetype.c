@@ -56,7 +56,7 @@ bool YULDUZ_AddInArchetype(
 
         void *store_element = YULDUZ_GetComponentInComponentStore(store, dense_index);
 
-        if (nullptr != component_data[i].Data)
+        if (nullptr != component_data && nullptr != component_data[i].Data)
             SDL_memcpy(store_element, component_data[i].Data, store->TypeSize);
         else
             SDL_memset(store_element, 0, store->TypeSize);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Yulduz/Engine/Archetype.h>
+#include <Yulduz/Engine/ECS.h>
 #include <Yulduz/Engine/Type.h>
 
 typedef enum YULDUZ_QueryAccessType YULDUZ_QueryAccessType;
@@ -14,40 +15,53 @@ enum YULDUZ_QueryAccessType {
 };
 
 struct YULDUZ_Query {
-    YULDUZ_QueryAccessType *RequiredComponentAccessTypes;
+    YULDUZ_QueryAccessType *WithComponentAccessTypes;
 
-    YULDUZ_Type *RequiredComponentTypes;
-    YULDUZ_Type *SortedRequiredComponentTypes;
+    YULDUZ_Type *WithComponentTypes;
+    YULDUZ_Type *WithTagTypes;
 
-    YULDUZ_Type *RequiredTagTypes;
-    YULDUZ_Type *SortedRequiredTagTypes;
+    YULDUZ_Type *WithoutComponentTypes;
+    YULDUZ_Type *WithoutTagTypes;
 
-    uint32_t RequiredComponentCapacity;
-    uint32_t RequiredComponentCount;
+    uint32_t WithComponentCapacity;
+    uint32_t WithComponentCount;
 
-    uint32_t RequiredTagCapacity;
-    uint32_t RequiredTagCount;
+    uint32_t WithTagCapacity;
+    uint32_t WithTagCount;
+
+    uint32_t WithoutComponentCapacity;
+    uint32_t WithoutComponentCount;
+
+    uint32_t WithoutTagCapacity;
+    uint32_t WithoutTagCount;
 };
 
 struct YULDUZ_QueryInfo {
     YULDUZ_Type *WithComponentTypes;
     YULDUZ_Type *WithTagTypes;
 
+    YULDUZ_Type *WithoutComponentTypes;
+    YULDUZ_Type *WithoutTagTypes;
+
     uint32_t WithComponentCount;
     uint32_t WithTagCount;
+
+    uint32_t WithoutComponentCount;
+    uint32_t WithoutTagCount;
 };
 
-YULDUZ_API bool YULDUZ_InitializeQuery(
-    YULDUZ_Query *query, uint32_t initial_component_capacity, uint32_t initial_tag_capacity);
+YULDUZ_API bool YULDUZ_InitializeQuery(YULDUZ_Query *query, uint32_t initial_component_capacity);
 YULDUZ_API void YULDUZ_ReleaseQuery(YULDUZ_Query *query);
 
-YULDUZ_API bool YULDUZ_SetQueryWithComponentType(
-    YULDUZ_Query *query, YULDUZ_Type component_type, YULDUZ_QueryAccessType access_type);
-YULDUZ_API bool YULDUZ_SetQueryWithTagType(YULDUZ_Query *query, YULDUZ_Type tag_type);
+YULDUZ_API bool YULDUZ_SetQueryWithComponentType(YULDUZ_Query *query, YULDUZ_Type type, YULDUZ_QueryAccessType access_type);
+YULDUZ_API bool YULDUZ_SetQueryWithoutComponentType(YULDUZ_Query *query, YULDUZ_Type type);
+
+YULDUZ_API bool YULDUZ_SetQueryWithTagType(YULDUZ_Query *query, YULDUZ_Type type);
+YULDUZ_API bool YULDUZ_SetQueryWithoutTagType(YULDUZ_Query *query, YULDUZ_Type type);
 
 YULDUZ_API bool YULDUZ_DeepCopyQuery(const YULDUZ_Query *src_query, YULDUZ_Query *dst_query);
 
-YULDUZ_API bool YULDUZ_CreateQueryInfo(const YULDUZ_Query *query, YULDUZ_QueryInfo *info);
+YULDUZ_API bool YULDUZ_CreateQueryInfo(YULDUZ_QueryInfo *info, const YULDUZ_Query *query);
 YULDUZ_API void YULDUZ_DestroyQueryInfo(YULDUZ_QueryInfo *info);
 
 YULDUZ_API bool YULDUZ_ArchetypeSupportsQueryInfo(const YULDUZ_QueryInfo *query, const YULDUZ_Archetype *archetype);

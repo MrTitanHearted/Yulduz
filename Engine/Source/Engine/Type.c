@@ -39,6 +39,9 @@ bool YULDUZ_RegisterTypesInTypeRegistry(
         if (YULDUZ_INVALID_TYPE != SDL_GetNumberProperty(registry->HashMap, type_descriptions[j].Name, YULDUZ_INVALID_TYPE)) {
             DYULDUZ_LOG_ENGINE_WARN("Type with name '%s' already exists", type_descriptions[j].Name);
             registered_all = false;
+            if (nullptr != types) {
+                types[j] = YULDUZ_INVALID_TYPE;
+            }
             continue;
         }
 

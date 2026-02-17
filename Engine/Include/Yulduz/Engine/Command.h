@@ -1,4 +1,4 @@
-#pragma once
+/*#pragma once
 
 #include <Yulduz/Engine/ECS.h>
 
@@ -97,4 +97,4 @@ YULDUZ_API bool YULDUZ_RemoveComponentWithType(
     YULDUZ_CommandBuffer *command_buffer, YULDUZ_Entity entity, YULDUZ_Type component_type);
 
 // Don't directly call this if you don't know what you are doing
-YULDUZ_API bool YULDUZ_FlushCommandBuffer(YULDUZ_CommandBuffer *command_buffer);
+YULDUZ_API bool YULDUZ_FlushCommandBuffer(YULDUZ_CommandBuffer *command_buffer);*/

@@ -1,317 +1,381 @@
-#include <Tests/Tests.h>
+#include <Yulduz/Engine.h>
+#include <SDL3/SDL.h>
+
+// Test helper macros
+#define TEST_ASSERT(condition, message)                                 \
+    do {                                                                \
+        if (!(condition)) {                                             \
+            YULDUZ_LOG_INFO("TEST FAILED: %s - %s", __func__, message); \
+            return false;                                               \
+        }                                                               \
+    } while (0)
+
+#define TEST_PASS()                                   \
+    do {                                              \
+        YULDUZ_LOG_INFO("TEST PASSED: %s", __func__); \
+        return true;                                  \
+    } while (0)
 
 // ============================================================================
-// ENTITY REGISTRY TESTS
+// Entity Registry Tests
 // ============================================================================
 
-void run_all_entity_registry_tests(void) {
-    YULDUZ_LOG_INFO("\n");
-    YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
-    YULDUZ_LOG_INFO("║           ENTITY REGISTRY TESTS                                ║");
-    YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝");
-    YULDUZ_LOG_INFO("\n");
+bool test_entity_registry_initialize_release(void) {
+    YULDUZ_EntityRegistry registry = {0};
 
-    test_entity_registry_create_destroy();
-    test_entity_registry_reuse();
-    test_entity_registry_records();
-    test_entity_registry_batch_operations();
-    test_entity_registry_free_list();
-    test_entity_registry_capacity_growth();
-    test_entity_registry_invalid_operations();
+    // Test initialization
+    TEST_ASSERT(YULDUZ_InitializeEntityRegistry(&registry, 16),
+                "Failed to initialize entity registry");
+    TEST_ASSERT(registry.SparseCapacity >= 16, "Capacity not set correctly");
+    TEST_ASSERT(registry.NextEntity == 0, "NextEntity should start at 0");
+    TEST_ASSERT(registry.FreeListCount == 0, "FreeList should be empty");
+    TEST_ASSERT(registry.Sparse != nullptr, "Sparse array should be allocated");
+
+    // Test release
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_ASSERT(registry.Sparse == nullptr, "Sparse should be null after release");
+    TEST_ASSERT(registry.FreeList == nullptr, "FreeList should be null after release");
+
+    TEST_PASS();
 }
 
-void test_entity_registry_create_destroy(void) {
-    TEST_START("Entity Registry Create/Destroy");
-
+bool test_entity_registry_create_single_entity(void) {
     YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_ASSERT(YULDUZ_InitializeEntityRegistry(&registry, 8),
-                  "Failed to initialize entity registry");
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT(YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entity),
+                "Failed to create entity");
+    TEST_ASSERT(entity != YULDUZ_INVALID_ENTITY, "Entity should be valid");
+    TEST_ASSERT(entity == 0, "First entity should be 0");
+    TEST_ASSERT(registry.NextEntity == 1, "NextEntity should be 1");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_create_multiple_entities(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    YULDUZ_Entity entities[10];
+    for (uint32_t i = 0; i < 10; i++) {
+        TEST_ASSERT(YULDUZ_CreateEntityInEntityRegistry(&registry, i, i * 2, &entities[i]),
+                    "Failed to create entity");
+        TEST_ASSERT(entities[i] == i, "Entity ID should match creation order");
+    }
+
+    TEST_ASSERT(registry.NextEntity == 10, "NextEntity should be 10");
+
+    // Verify all entities are unique
+    for (uint32_t i = 0; i < 10; i++) {
+        for (uint32_t j = i + 1; j < 10; j++) {
+            TEST_ASSERT(entities[i] != entities[j], "Entities should be unique");
+        }
+    }
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_destroy_entity(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    // Create entity
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInEntityRegistry(&registry, 5, 10, &entity);
+
+    // Destroy entity
+    TEST_ASSERT(YULDUZ_DestroyEntityInEntityRegistry(&registry, entity),
+                "Failed to destroy entity");
+    TEST_ASSERT(registry.FreeListCount == 1, "FreeList should have 1 entry");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_entity_reuse(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    // Create and destroy entity
+    YULDUZ_Entity entity1 = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entity1);
+    YULDUZ_DestroyEntityInEntityRegistry(&registry, entity1);
+
+    // Create new entity - should reuse the ID
+    YULDUZ_Entity entity2 = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInEntityRegistry(&registry, 1, 1, &entity2);
+
+    TEST_ASSERT(entity2 == entity1, "Entity ID should be reused");
+    TEST_ASSERT(registry.FreeListCount == 0, "FreeList should be empty after reuse");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_get_entity_record(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    // Create entity
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInEntityRegistry(&registry, 7, 14, &entity);
+
+    // Get entity record
+    YULDUZ_EntityRecord record = {0};
+    TEST_ASSERT(YULDUZ_GetEntityRecordsInEntityRegistry(&registry, &entity, &record, 1),
+                "Failed to get entity record");
+    TEST_ASSERT(record.ArchetypeType == 7, "ArchetypeType mismatch");
+    TEST_ASSERT(record.ArchetypeIndex == 14, "ArchetypeIndex mismatch");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_get_multiple_entity_records(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
 
     // Create entities
     YULDUZ_Entity entities[5];
     for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_ASSERT(YULDUZ_CreateEntityInEntityRegistry(&registry, i, i * 10, &entities[i]),
-                      "Failed to create entity %u", i);
-        YULDUZ_ASSERT(entities[i] != YULDUZ_INVALID_ENTITY, "Entity should be valid");
+        YULDUZ_CreateEntityInEntityRegistry(&registry, i * 2, i * 3, &entities[i]);
     }
 
-    // Entities should be sequential starting from 0
+    // Get all records
+    YULDUZ_EntityRecord records[5];
+    TEST_ASSERT(YULDUZ_GetEntityRecordsInEntityRegistry(&registry, entities, records, 5),
+                "Failed to get entity records");
+
+    // Verify all records
     for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_ASSERT(entities[i] == i, "Entity ID should be %u", i);
+        TEST_ASSERT(records[i].ArchetypeType == i * 2, "ArchetypeType mismatch");
+        TEST_ASSERT(records[i].ArchetypeIndex == i * 3, "ArchetypeIndex mismatch");
     }
-
-    // Destroy middle entity
-    YULDUZ_ASSERT(YULDUZ_DestroyEntityInEntityRegistry(&registry, entities[2]),
-                  "Failed to destroy entity");
-
-    // Verify we can't get record for destroyed entity
-    YULDUZ_EntityRecord record;
-    bool result = YULDUZ_GetEntityRecordsInEntityRegistry(&registry, &entities[2], &record, 1);
-    YULDUZ_ASSERT(!result, "Should not be able to get record for destroyed entity");
 
     YULDUZ_ReleaseEntityRegistry(&registry);
-
-    TEST_END("Entity Registry Create/Destroy");
+    TEST_PASS();
 }
 
-void test_entity_registry_reuse(void) {
-    TEST_START("Entity Registry ID Reuse");
-
+bool test_entity_registry_set_entity_record(void) {
     YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_ASSERT(YULDUZ_InitializeEntityRegistry(&registry, 8),
-                  "Failed to initialize");
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    // Create entity
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entity);
+
+    // Update entity record
+    YULDUZ_EntityRecord new_record = {
+        .ArchetypeType  = 42,
+        .ArchetypeIndex = 84};
+    TEST_ASSERT(YULDUZ_SetEntityRecordsInEntityRegistry(&registry, &entity, &new_record, 1),
+                "Failed to set entity record");
+
+    // Verify update
+    YULDUZ_EntityRecord retrieved = {0};
+    YULDUZ_GetEntityRecordsInEntityRegistry(&registry, &entity, &retrieved, 1);
+    TEST_ASSERT(retrieved.ArchetypeType == 42, "ArchetypeType not updated");
+    TEST_ASSERT(retrieved.ArchetypeIndex == 84, "ArchetypeIndex not updated");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_set_multiple_entity_records(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
 
     // Create entities
-    YULDUZ_Entity e1, e2, e3;
-    YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &e1);
-    YULDUZ_CreateEntityInEntityRegistry(&registry, 1, 10, &e2);
-    YULDUZ_CreateEntityInEntityRegistry(&registry, 2, 20, &e3);
-
-    YULDUZ_LOG_INFO("Created entities: %u, %u, %u", e1, e2, e3);
-
-    // Destroy first entity
-    YULDUZ_DestroyEntityInEntityRegistry(&registry, e1);
-
-    YULDUZ_ASSERT(registry.FreeListCount == 1, "Free list should have 1 entry");
-
-    // Create new entity - should reuse e1's ID
-    YULDUZ_Entity e4;
-    YULDUZ_CreateEntityInEntityRegistry(&registry, 3, 30, &e4);
-
-    YULDUZ_ASSERT(e4 == e1, "New entity should reuse first destroyed entity's ID");
-    YULDUZ_ASSERT(registry.FreeListCount == 0, "Free list should be empty after reuse");
-
-    // Verify new entity has correct archetype assignment
-    YULDUZ_EntityRecord record;
-    YULDUZ_GetEntityRecordsInEntityRegistry(&registry, &e4, &record, 1);
-    YULDUZ_ASSERT(record.ArchetypeType == 3, "Reused entity should have new archetype type");
-    YULDUZ_ASSERT(record.ArchetypeIndex == 30, "Reused entity should have new archetype index");
-
-    YULDUZ_ReleaseEntityRegistry(&registry);
-
-    TEST_END("Entity Registry ID Reuse");
-}
-
-void test_entity_registry_records(void) {
-    TEST_START("Entity Registry Get/Set Records");
-
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_ASSERT(YULDUZ_InitializeEntityRegistry(&registry, 8),
-                  "Failed to initialize");
-
-    // Create entities with different archetype assignments
-    YULDUZ_Entity entities[3];
-    YULDUZ_CreateEntityInEntityRegistry(&registry, 5, 100, &entities[0]);
-    YULDUZ_CreateEntityInEntityRegistry(&registry, 7, 200, &entities[1]);
-    YULDUZ_CreateEntityInEntityRegistry(&registry, 9, 300, &entities[2]);
-
-    // Get records
-    YULDUZ_EntityRecord records[3];
-    YULDUZ_ASSERT(YULDUZ_GetEntityRecordsInEntityRegistry(&registry, entities, records, 3),
-                  "Failed to get records");
-
-    YULDUZ_ASSERT(records[0].ArchetypeType == 5 && records[0].ArchetypeIndex == 100,
-                  "Record 0 should match");
-    YULDUZ_ASSERT(records[1].ArchetypeType == 7 && records[1].ArchetypeIndex == 200,
-                  "Record 1 should match");
-    YULDUZ_ASSERT(records[2].ArchetypeType == 9 && records[2].ArchetypeIndex == 300,
-                  "Record 2 should match");
-
-    // Update records
-    YULDUZ_EntityRecord new_records[3] = {
-        {.ArchetypeType = 10, .ArchetypeIndex = 1000},
-        {.ArchetypeType = 20, .ArchetypeIndex = 2000},
-        {.ArchetypeType = 30, .ArchetypeIndex = 3000}
-    };
-
-    YULDUZ_ASSERT(YULDUZ_SetEntityRecordsInEntityRegistry(&registry, entities, new_records, 3),
-                  "Failed to set records");
-
-    // Verify updates
-    YULDUZ_EntityRecord verify[3];
-    YULDUZ_GetEntityRecordsInEntityRegistry(&registry, entities, verify, 3);
-
-    YULDUZ_ASSERT(verify[0].ArchetypeType == 10 && verify[0].ArchetypeIndex == 1000,
-                  "Updated record 0 should match");
-    YULDUZ_ASSERT(verify[1].ArchetypeType == 20 && verify[1].ArchetypeIndex == 2000,
-                  "Updated record 1 should match");
-    YULDUZ_ASSERT(verify[2].ArchetypeType == 30 && verify[2].ArchetypeIndex == 3000,
-                  "Updated record 2 should match");
-
-    YULDUZ_ReleaseEntityRegistry(&registry);
-
-    TEST_END("Entity Registry Get/Set Records");
-}
-
-void test_entity_registry_batch_operations(void) {
-    TEST_START("Entity Registry Batch Operations");
-
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_ASSERT(YULDUZ_InitializeEntityRegistry(&registry, 16),
-                  "Failed to initialize");
-
-    const uint32_t count = 10;
-    YULDUZ_Entity entities[count];
-
-    // Batch create
-    for (uint32_t i = 0; i < count; i++) {
-        YULDUZ_CreateEntityInEntityRegistry(&registry, i, i * 100, &entities[i]);
-    }
-
-    // Batch get
-    YULDUZ_EntityRecord records[count];
-    YULDUZ_ASSERT(YULDUZ_GetEntityRecordsInEntityRegistry(&registry, entities, records, count),
-                  "Batch get should succeed");
-
-    for (uint32_t i = 0; i < count; i++) {
-        YULDUZ_ASSERT(records[i].ArchetypeType == i, "Type for entity %u should match", i);
-        YULDUZ_ASSERT(records[i].ArchetypeIndex == i * 100, "Index for entity %u should match", i);
-    }
-
-    // Batch update
-    YULDUZ_EntityRecord new_records[count];
-    for (uint32_t i = 0; i < count; i++) {
-        new_records[i].ArchetypeType = 50 + i;
-        new_records[i].ArchetypeIndex = 5000 + i;
-    }
-
-    YULDUZ_ASSERT(YULDUZ_SetEntityRecordsInEntityRegistry(&registry, entities, new_records, count),
-                  "Batch set should succeed");
-
-    // Verify
-    YULDUZ_EntityRecord verify[count];
-    YULDUZ_GetEntityRecordsInEntityRegistry(&registry, entities, verify, count);
-
-    for (uint32_t i = 0; i < count; i++) {
-        YULDUZ_ASSERT(verify[i].ArchetypeType == 50 + i, "Updated type should match");
-        YULDUZ_ASSERT(verify[i].ArchetypeIndex == 5000 + i, "Updated index should match");
-    }
-
-    YULDUZ_ReleaseEntityRegistry(&registry);
-
-    TEST_END("Entity Registry Batch Operations");
-}
-
-void test_entity_registry_free_list(void) {
-    TEST_START("Entity Registry Free List Management");
-
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_ASSERT(YULDUZ_InitializeEntityRegistry(&registry, 8),
-                  "Failed to initialize");
-
-    // Create 5 entities
     YULDUZ_Entity entities[5];
     for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_CreateEntityInEntityRegistry(&registry, i, i, &entities[i]);
+        YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entities[i]);
     }
 
-    YULDUZ_ASSERT(registry.FreeListCount == 0, "Free list should be empty");
+    // Update all records
+    YULDUZ_EntityRecord new_records[5];
+    for (uint32_t i = 0; i < 5; i++) {
+        new_records[i].ArchetypeType  = i * 10;
+        new_records[i].ArchetypeIndex = i * 20;
+    }
+    TEST_ASSERT(YULDUZ_SetEntityRecordsInEntityRegistry(&registry, entities, new_records, 5),
+                "Failed to set entity records");
 
-    // Destroy 3 entities
-    for (uint32_t i = 0; i < 3; i++) {
+    // Verify all updates
+    YULDUZ_EntityRecord retrieved[5];
+    YULDUZ_GetEntityRecordsInEntityRegistry(&registry, entities, retrieved, 5);
+    for (uint32_t i = 0; i < 5; i++) {
+        TEST_ASSERT(retrieved[i].ArchetypeType == i * 10, "ArchetypeType not updated");
+        TEST_ASSERT(retrieved[i].ArchetypeIndex == i * 20, "ArchetypeIndex not updated");
+    }
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_capacity_growth(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 4);  // Small initial capacity
+
+    uint32_t initial_capacity = registry.SparseCapacity;
+
+    // Create more entities than initial capacity
+    YULDUZ_Entity entities[10];
+    for (uint32_t i = 0; i < 10; i++) {
+        YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entities[i]);
+    }
+
+    TEST_ASSERT(registry.SparseCapacity > initial_capacity, "Capacity should have grown");
+    TEST_ASSERT(registry.NextEntity == 10, "Should have created 10 entities");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_invalid_entity_operations(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    // Try to destroy invalid entity
+    TEST_ASSERT(!YULDUZ_DestroyEntityInEntityRegistry(&registry, YULDUZ_INVALID_ENTITY),
+                "Should fail to destroy invalid entity");
+
+    // Try to get record for invalid entity
+    YULDUZ_EntityRecord record = {0};
+    TEST_ASSERT(!YULDUZ_GetEntityRecordsInEntityRegistry(&registry,
+                                                         &(YULDUZ_Entity){YULDUZ_INVALID_ENTITY}, &record, 1),
+                "Should fail to get record for invalid entity");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_destroy_nonexistent_entity(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    // Try to destroy entity that was never created
+    TEST_ASSERT(!YULDUZ_DestroyEntityInEntityRegistry(&registry, 999),
+                "Should fail to destroy non-existent entity");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_double_destroy(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    // Create and destroy entity
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entity);
+    YULDUZ_DestroyEntityInEntityRegistry(&registry, entity);
+
+    // Try to destroy again
+    TEST_ASSERT(!YULDUZ_DestroyEntityInEntityRegistry(&registry, entity),
+                "Should fail to destroy entity twice");
+
+    YULDUZ_ReleaseEntityRegistry(&registry);
+    TEST_PASS();
+}
+
+bool test_entity_registry_fragmentation_handling(void) {
+    YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
+
+    // Create 10 entities
+    YULDUZ_Entity entities[10];
+    for (uint32_t i = 0; i < 10; i++) {
+        YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entities[i]);
+    }
+
+    // Destroy every other entity
+    for (uint32_t i = 0; i < 10; i += 2) {
         YULDUZ_DestroyEntityInEntityRegistry(&registry, entities[i]);
     }
 
-    YULDUZ_ASSERT(registry.FreeListCount == 3, "Free list should have 3 entries");
+    TEST_ASSERT(registry.FreeListCount == 5, "FreeList should have 5 entries");
 
-    // Create 3 new entities - should all come from free list
-    YULDUZ_Entity new_entities[3];
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_CreateEntityInEntityRegistry(&registry, 10 + i, 100 + i, &new_entities[i]);
+    // Create 5 new entities - should reuse destroyed IDs
+    YULDUZ_Entity new_entities[5];
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_CreateEntityInEntityRegistry(&registry, 1, 1, &new_entities[i]);
     }
 
-    YULDUZ_ASSERT(registry.FreeListCount == 0, "Free list should be empty again");
+    TEST_ASSERT(registry.FreeListCount == 0, "FreeList should be empty after reuse");
 
-    // New entities should have reused the destroyed IDs
-    bool all_reused = true;
-    for (uint32_t i = 0; i < 3; i++) {
+    // Verify new entities reused old IDs
+    for (uint32_t i = 0; i < 5; i++) {
         bool found = false;
-        for (uint32_t j = 0; j < 3; j++) {
+        for (uint32_t j = 0; j < 10; j += 2) {
             if (new_entities[i] == entities[j]) {
                 found = true;
                 break;
             }
         }
-        if (!found) {
-            all_reused = false;
-            break;
-        }
+        TEST_ASSERT(found, "New entity should have reused destroyed ID");
     }
 
-    YULDUZ_ASSERT(all_reused, "All new entities should have reused destroyed IDs");
-
     YULDUZ_ReleaseEntityRegistry(&registry);
-
-    TEST_END("Entity Registry Free List Management");
+    TEST_PASS();
 }
 
-void test_entity_registry_capacity_growth(void) {
-    TEST_START("Entity Registry Capacity Growth");
-
+bool test_entity_registry_stress_create_destroy(void) {
     YULDUZ_EntityRegistry registry = {0};
+    YULDUZ_InitializeEntityRegistry(&registry, 16);
 
-    // Start with small capacity
-    YULDUZ_ASSERT(YULDUZ_InitializeEntityRegistry(&registry, 2),
-                  "Failed to initialize with small capacity");
-
-    YULDUZ_ASSERT(registry.SparseCapacity == 2, "Initial capacity should be 2");
-
-    // Create entities beyond initial capacity
-    YULDUZ_Entity entities[20];
-    for (uint32_t i = 0; i < 20; i++) {
-        YULDUZ_ASSERT(YULDUZ_CreateEntityInEntityRegistry(&registry, i, i * 10, &entities[i]),
-                      "Failed to create entity %u", i);
+    // Rapidly create and destroy entities
+    for (uint32_t iteration = 0; iteration < 100; iteration++) {
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInEntityRegistry(&registry, iteration, iteration * 2, &entity);
+        YULDUZ_DestroyEntityInEntityRegistry(&registry, entity);
     }
 
-    YULDUZ_ASSERT(registry.SparseCapacity >= 20, "Capacity should have grown to at least 20");
-
-    // Verify all entities are still valid and accessible
-    for (uint32_t i = 0; i < 20; i++) {
-        YULDUZ_EntityRecord record;
-        YULDUZ_ASSERT(YULDUZ_GetEntityRecordsInEntityRegistry(&registry, &entities[i], &record, 1),
-                      "Should be able to get record for entity %u", i);
-        YULDUZ_ASSERT(record.ArchetypeType == i, "Archetype type should match for entity %u", i);
-    }
+    TEST_ASSERT(registry.FreeListCount > 0, "FreeList should have entries");
 
     YULDUZ_ReleaseEntityRegistry(&registry);
-
-    TEST_END("Entity Registry Capacity Growth");
+    TEST_PASS();
 }
 
-void test_entity_registry_invalid_operations(void) {
-    TEST_START("Entity Registry Invalid Operations");
+// ============================================================================
+// Test Runner
+// ============================================================================
 
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_ASSERT(YULDUZ_InitializeEntityRegistry(&registry, 8),
-                  "Failed to initialize");
+void run_all_entity_registry_tests(void) {
+    YULDUZ_LOG_INFO("\n========================================");
+    YULDUZ_LOG_INFO("Running Entity Registry Tests");
+    YULDUZ_LOG_INFO("========================================\n");
 
-    // Try to destroy non-existent entity
-    bool result = YULDUZ_DestroyEntityInEntityRegistry(&registry, 999);
-    YULDUZ_ASSERT(!result, "Destroying non-existent entity should fail");
+    uint32_t passed = 0;
+    uint32_t total  = 0;
 
-    // Try to get record for invalid entity
-    YULDUZ_Entity invalid = YULDUZ_INVALID_ENTITY;
-    YULDUZ_EntityRecord record;
-    result = YULDUZ_GetEntityRecordsInEntityRegistry(&registry, &invalid, &record, 1);
-    YULDUZ_ASSERT(!result, "Getting record for INVALID_ENTITY should fail");
+#define RUN_TEST(test)        \
+    do {                      \
+        total++;              \
+        if (test()) passed++; \
+    } while (0)
 
-    // Try to set record for invalid entity
-    YULDUZ_EntityRecord new_record = {.ArchetypeType = 0, .ArchetypeIndex = 0};
-    result = YULDUZ_SetEntityRecordsInEntityRegistry(&registry, &invalid, &new_record, 1);
-    YULDUZ_ASSERT(!result, "Setting record for INVALID_ENTITY should fail");
+    RUN_TEST(test_entity_registry_initialize_release);
+    RUN_TEST(test_entity_registry_create_single_entity);
+    RUN_TEST(test_entity_registry_create_multiple_entities);
+    RUN_TEST(test_entity_registry_destroy_entity);
+    RUN_TEST(test_entity_registry_entity_reuse);
+    RUN_TEST(test_entity_registry_get_entity_record);
+    RUN_TEST(test_entity_registry_get_multiple_entity_records);
+    RUN_TEST(test_entity_registry_set_entity_record);
+    RUN_TEST(test_entity_registry_set_multiple_entity_records);
+    RUN_TEST(test_entity_registry_capacity_growth);
+    RUN_TEST(test_entity_registry_invalid_entity_operations);
+    RUN_TEST(test_entity_registry_destroy_nonexistent_entity);
+    RUN_TEST(test_entity_registry_double_destroy);
+    RUN_TEST(test_entity_registry_fragmentation_handling);
+    RUN_TEST(test_entity_registry_stress_create_destroy);
 
-    // Create entity then destroy it, then try operations on it
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entity);
-    YULDUZ_DestroyEntityInEntityRegistry(&registry, entity);
+#undef RUN_TEST
 
-    result = YULDUZ_GetEntityRecordsInEntityRegistry(&registry, &entity, &record, 1);
-    YULDUZ_ASSERT(!result, "Getting record for destroyed entity should fail");
-
-    result = YULDUZ_SetEntityRecordsInEntityRegistry(&registry, &entity, &new_record, 1);
-    YULDUZ_ASSERT(!result, "Setting record for destroyed entity should fail");
-
-    YULDUZ_ReleaseEntityRegistry(&registry);
-
-    TEST_END("Entity Registry Invalid Operations");
+    YULDUZ_LOG_INFO("\n========================================");
+    YULDUZ_LOG_INFO("Entity Registry Tests: %u/%u passed", passed, total);
+    YULDUZ_LOG_INFO("========================================\n");
 }

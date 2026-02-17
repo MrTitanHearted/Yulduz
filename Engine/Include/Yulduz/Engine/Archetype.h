@@ -31,7 +31,7 @@ YULDUZ_API void YULDUZ_ReleaseArchetype(YULDUZ_Archetype *archetype);
 // type datas must be sorted according to their type ids
 YULDUZ_API bool YULDUZ_AddInArchetype(
     YULDUZ_Archetype *archetype, YULDUZ_Entity entity,
-    const YULDUZ_TypeDataInfo *component_data, YULDUZ_ArchetypeIndex *index);
+    YULDUZ_NULLABLE const YULDUZ_TypeDataInfo *component_data, YULDUZ_ArchetypeIndex *index);
 YULDUZ_API bool YULDUZ_RemoveInArchetype(
     YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index, YULDUZ_Entity *moved_entity);
 

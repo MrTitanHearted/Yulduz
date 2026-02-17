@@ -1,3 +1,4 @@
+/*
 #include <Yulduz/Engine/Command.h>
 
 bool YULDUZ_ExecuteCommandInCommandBuffer(YULDUZ_CommandBuffer *command_buffer, YULDUZ_Command *command);
@@ -232,3 +233,4 @@ void YULDUZ_EnsureArenaCapacityInCommandBuffer(YULDUZ_CommandBuffer *command_buf
     command_buffer->ArenaCapacity = new_capacity;
     command_buffer->ArenaData     = new_arena;
 }
+*/

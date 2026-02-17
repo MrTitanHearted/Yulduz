@@ -67,6 +67,10 @@ YULDUZ_API bool YULDUZ_GetTypeDescriptionInECSRegistry(
 YULDUZ_API bool YULDUZ_CreateEntityInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity *entity);
 YULDUZ_API bool YULDUZ_DestroyEntityInECSRegistry(YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity);
 
+
+YULDUZ_API bool YULDUZ_HasTagInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *tag_name);
+
 // Sets existing component data (immediate, no archetype change)
 // Returns false if entity doesn't have this component
 YULDUZ_API bool YULDUZ_SetComponentInECSRegistry(
@@ -76,6 +80,9 @@ YULDUZ_API bool YULDUZ_GetComponentInECSRegistry(
     const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
     const char *component_name, void *component_data);
 
+YULDUZ_API bool YULDUZ_HasTagWithTypeInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type);
+
 YULDUZ_API bool YULDUZ_SetComponentWithTypeInECSRegistry(
     const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
     YULDUZ_Type component_type, YULDUZ_NULLABLE const void *component_data);
@@ -83,11 +90,21 @@ YULDUZ_API bool YULDUZ_GetComponentWithTypeInECSRegistry(
     const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
     YULDUZ_Type component_type, void *component_data);
 
+YULDUZ_API bool YULDUZ_AddTagInECSRegistry(
+    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *tag_name);
+YULDUZ_API bool YULDUZ_RemoveTagInECSRegistry(
+    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *tag_name);
+
 YULDUZ_API bool YULDUZ_AddComponentInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
     const char *component_name, YULDUZ_NULLABLE const void *component_data);
 YULDUZ_API bool YULDUZ_RemoveComponentInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, const char *component_name);
+
+YULDUZ_API bool YULDUZ_AddTagWithTypeInECSRegistry(
+    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type);
+YULDUZ_API bool YULDUZ_RemoveTagWithTypeInECSRegistry(
+    YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_Type tag_type);
 
 YULDUZ_API bool YULDUZ_AddComponentWithTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
