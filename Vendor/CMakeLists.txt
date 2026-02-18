@@ -2,10 +2,10 @@ cmake_minimum_required(VERSION 3.20)
 
 add_subdirectory(SDL)
 add_subdirectory(SDL_image)
-#add_subdirectory(SDL_mixer)
+add_subdirectory(SDL_mixer)
 add_subdirectory(SDL_net)
 #add_subdirectory(SDL_shadercross)
-#add_subdirectory(SDL_ttf)
+add_subdirectory(SDL_ttf)
 
 find_package(assimp CONFIG REQUIRED)
 find_package(cglm CONFIG REQUIRED)
@@ -27,11 +27,11 @@ target_link_libraries(YulduzVendor PUBLIC
     assimp::assimp
     cglm::cglm
     SDL3::SDL3
-    #    SDL3_image::SDL3_image
-    #    SDL3_mixer::SDL3_mixer
+    SDL3_image::SDL3_image
+    SDL3_mixer::SDL3_mixer
     SDL3_net::SDL3_net
     #    SDL3_shadercross::SDL3_shadercross
-    #    SDL3_ttf::SDL3_ttf
+    SDL3_ttf::SDL3_ttf
 )
 
 target_include_directories(YulduzVendor PUBLIC

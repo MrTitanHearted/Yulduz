@@ -13,9 +13,11 @@ struct YULDUZ_EntityRecord {
 struct YULDUZ_EntityRegistry {
     YULDUZ_EntityRecord *Sparse;
 
-    YULDUZ_Entity *FreeList;
+    uint32_t *SparseGenerations;
 
-    YULDUZ_Entity NextEntity;
+    uint32_t *FreeList;
+
+    uint32_t NextEntity;
 
     uint32_t SparseCapacity;
 

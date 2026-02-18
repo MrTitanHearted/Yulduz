@@ -108,7 +108,8 @@ bool test_entity_registry_entity_reuse(void) {
     YULDUZ_Entity entity2 = YULDUZ_INVALID_ENTITY;
     YULDUZ_CreateEntityInEntityRegistry(&registry, 1, 1, &entity2);
 
-    TEST_ASSERT(entity2 == entity1, "Entity ID should be reused");
+    TEST_ASSERT((uint32_t)entity2 == (uint32_t)entity1, "Entity ID indices should be reused");
+    TEST_ASSERT(entity2 != entity1, "Entity ID generations should not be reused");
     TEST_ASSERT(registry.FreeListCount == 0, "FreeList should be empty after reuse");
 
     YULDUZ_ReleaseEntityRegistry(&registry);
@@ -310,7 +311,7 @@ bool test_entity_registry_fragmentation_handling(void) {
     for (uint32_t i = 0; i < 5; i++) {
         bool found = false;
         for (uint32_t j = 0; j < 10; j += 2) {
-            if (new_entities[i] == entities[j]) {
+            if ((uint32_t)new_entities[i] == (uint32_t)entities[j]) {
                 found = true;
                 break;
             }
