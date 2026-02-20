@@ -1,623 +1,429 @@
-#include <Yulduz/Engine.h>
+#include <Tests/Tests.h>
 
-// Test helper macros
-#define TEST_ASSERT(condition, fmt, ...)                                        \
-    do {                                                                        \
-        if (!(condition)) {                                                     \
-            YULDUZ_LOG_INFO("TEST FAILED: %s - " fmt, __func__, ##__VA_ARGS__); \
-            return false;                                                       \
-        }                                                                       \
-    } while (0)
+// ============================================================
+// TEST TYPES
+// ============================================================
 
-#define TEST_PASS()                                   \
-    do {                                              \
-        YULDUZ_LOG_INFO("TEST PASSED: %s", __func__); \
-        return true;                                  \
-    } while (0)
-
-// Helper structures
-typedef struct Position {
+typedef struct TestPosition {
     float x, y, z;
-} Position;
+} TestPosition;
 
-typedef struct Velocity {
+typedef struct TestVelocity {
     float x, y, z;
-} Velocity;
+} TestVelocity;
 
-typedef struct Health {
-    float value;
-    float max_value;
-} Health;
+typedef struct TestHealth {
+    float current, max;
+} TestHealth;
 
-typedef struct TestUserData {
-    uint32_t call_count;
-    uint32_t entity_count;
-    float    total_x;
-} TestUserData;
+// ============================================================
+// SYSTEM TEST DATA
+// ============================================================
 
-// ============================================================================
-// Test System Functions
-// ============================================================================
+typedef struct SystemTestData {
+    uint32_t archetype_call_count;
+    uint32_t total_entity_count;
+    uint32_t custom_value;
+    float    delta_time;
+    bool     was_called;
+} SystemTestData;
 
-void TestSystem_Empty(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
-    (void)archetype;
-    (void)query;
+// ============================================================
+// TEST SYSTEM CALLBACKS
+// ============================================================
 
-    TestUserData *data = (TestUserData *)user_data;
-    data->call_count++;
+static void empty_system(
+    const YULDUZ_Archetype *archetype,
+    const YULDUZ_QueryInfo *query,
+    void                   *user_data) {
+    SystemTestData *data = (SystemTestData *)user_data;
+    data->archetype_call_count++;
+    data->total_entity_count += archetype->DenseCount;
+    data->was_called = true;
 }
 
-void TestSystem_CountEntities(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
-    (void)query;
+static void position_update_system(
+    const YULDUZ_Archetype *archetype,
+    const YULDUZ_QueryInfo *query,
+    void                   *user_data) {
+    SystemTestData *data = (SystemTestData *)user_data;
 
-    TestUserData *data = (TestUserData *)user_data;
-    data->call_count++;
-    data->entity_count += archetype->DenseCount;
-}
-
-void TestSystem_ProcessPosition(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
-    (void)query;
-
-    TestUserData *data = (TestUserData *)user_data;
-    data->call_count++;
-
-    // Find Position component store
+    // Find Position store
+    YULDUZ_ComponentStore *pos_store = NULL;
     for (uint32_t i = 0; i < archetype->StoreCount; i++) {
+        // Compare with first component in query
         if (archetype->Stores[i].Type == query->WithComponentTypes[0]) {
-            Position *positions = (Position *)archetype->Stores[i].Dense;
-            for (uint32_t j = 0; j < archetype->DenseCount; j++) {
-                data->total_x += positions[j].x;
-            }
+            pos_store = &archetype->Stores[i];
             break;
         }
     }
-}
 
-void TestSystem_UpdateVelocity(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
-    (void)query;
-    (void)user_data;
-
-    // Find Position and Velocity stores
-    Position *positions  = NULL;
-    Velocity *velocities = NULL;
-
-    for (uint32_t i = 0; i < archetype->StoreCount; i++) {
-        for (uint32_t q = 0; q < query->WithComponentCount; q++) {
-            if (archetype->Stores[i].Type == query->WithComponentTypes[q]) {
-                // Assuming first is Position, second is Velocity based on query order
-                if (q == 0) {
-                    positions = (Position *)archetype->Stores[i].Dense;
-                } else if (q == 1) {
-                    velocities = (Velocity *)archetype->Stores[i].Dense;
-                }
-            }
-        }
-    }
-
-    if (positions && velocities) {
+    if (pos_store != NULL) {
+        // Update all positions
         for (uint32_t i = 0; i < archetype->DenseCount; i++) {
-            positions[i].x += velocities[i].x;
-            positions[i].y += velocities[i].y;
-            positions[i].z += velocities[i].z;
+            TestPosition *pos = (TestPosition *)YULDUZ_GetComponentInComponentStore(pos_store, i);
+            pos->x += 1.0f * data->delta_time;
+            pos->y += 1.0f * data->delta_time;
+            pos->z += 1.0f * data->delta_time;
         }
     }
+
+    data->archetype_call_count++;
+    data->total_entity_count += archetype->DenseCount;
 }
 
-// ============================================================================
-// System Tests
-// ============================================================================
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
 
-bool test_system_initialize_release(void) {
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-
-    YULDUZ_System system = {0};
-    TEST_ASSERT(YULDUZ_InitializeSystem(&system, "TestSystem", &query, &TestSystem_Empty),
-                "Failed to initialize system");
-    TEST_ASSERT(system.Name != NULL, "Name should be set");
-    TEST_ASSERT(system.SystemPFN == &TestSystem_Empty, "System function pointer mismatch");
-    TEST_ASSERT(system.DenseCount == 0, "Initial archetype count should be 0");
-
-    YULDUZ_ReleaseSystem(&system);
-    TEST_ASSERT(system.Name == NULL, "Name should be null after release");
-
-    YULDUZ_ReleaseQuery(&query);
-    TEST_PASS();
+static bool setup_test_ecs(YULDUZ_ECSRegistry *ecs) {
+    YULDUZ_ECSRegistryInitializeInfo info = {
+        .InitialEntityCapacity        = 64,
+        .InitialTagTypeCapacity       = 16,
+        .InitialComponentTypeCapacity = 16,
+        .InitialArchetypeCapacity     = 16,
+        .InitialArchetypeTypeCapacity = 16,
+    };
+    return YULDUZ_InitializeECSRegistry(ecs, &info);
 }
 
-bool test_system_run_empty(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+// ============================================================
+// SYSTEM INITIALIZATION TESTS
+// ============================================================
 
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
+static void test_system_initialization(void) {
+    TEST_START("System: Initialization and Release");
 
-    YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "TestSystem", &query, &TestSystem_Empty);
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
 
-    TestUserData user_data = {0};
-    YULDUZ_RunSystem(&system, &registry, &user_data);
-
-    // Should be called at least once for null archetype
-    TEST_ASSERT(user_data.call_count >= 1, "System should be called at least once");
-
-    YULDUZ_ReleaseSystem(&system);
-    YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_system_with_single_component_query(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register Position component
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_Type pos_type;
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, &pos_type);
-
-    // Create query for Position
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read);
-
-    // Create system
-    YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "PositionSystem", &query, &TestSystem_CountEntities);
-
-    // Create entities with Position
-    for (uint32_t i = 0; i < 10; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {(float)i, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    }
-
-    // Run system
-    TestUserData user_data = {0};
-    YULDUZ_RunSystem(&system, &registry, &user_data);
-
-    TEST_ASSERT(user_data.entity_count == 10, "Should process 10 entities");
-
-    YULDUZ_ReleaseSystem(&system);
-    YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_system_with_multiple_component_query(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 64, 16, 32};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register components
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)}};
-
-    YULDUZ_Type types[2];
-    for (uint32_t i = 0; i < 2; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], &types[i]);
-    }
-
-    // Create query for Position and Velocity
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, types[0], YULDUZ_QueryAccessType_Write);
-    YULDUZ_SetQueryWithComponentType(&query, types[1], YULDUZ_QueryAccessType_Read);
-
-    // Create system
-    YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "MovementSystem", &query, &TestSystem_CountEntities);
-
-    // Create entities with both components
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        Velocity vel = {1.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Velocity", &vel);
-    }
-
-    // Create entities with only Position (should not match)
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    }
-
-    // Run system
-    TestUserData user_data = {0};
-    YULDUZ_RunSystem(&system, &registry, &user_data);
-
-    TEST_ASSERT(user_data.entity_count == 5, "Should only process entities with both components");
-
-    YULDUZ_ReleaseSystem(&system);
-    YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_system_with_tag_query(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 64, 16, 32};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register types
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Player", .Size = 0, .Alignment = 0}};
-
-    YULDUZ_Type types[2];
-    for (uint32_t i = 0; i < 2; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], &types[i]);
-    }
-
-    // Create query for Position + Player tag
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, types[0], YULDUZ_QueryAccessType_Read);
-    YULDUZ_SetQueryWithTagType(&query, types[1]);
-
-    // Create system
-    YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "PlayerSystem", &query, &TestSystem_CountEntities);
-
-    // Create player entities
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-        YULDUZ_AddTagInECSRegistry(&registry, entity, "Player");
-    }
-
-    // Create non-player entities
-    for (uint32_t i = 0; i < 7; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    }
-
-    // Run system
-    TestUserData user_data = {0};
-    YULDUZ_RunSystem(&system, &registry, &user_data);
-
-    TEST_ASSERT(user_data.entity_count == 3, "Should only process player entities");
-
-    YULDUZ_ReleaseSystem(&system);
-    YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_system_with_exclusion_query(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 64, 16, 32};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register types
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Dead", .Size = 0, .Alignment = 0}};
-
-    YULDUZ_Type types[2];
-    for (uint32_t i = 0; i < 2; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], &types[i]);
-    }
-
-    // Create query for Position WITHOUT Dead tag
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, types[0], YULDUZ_QueryAccessType_Read);
-    YULDUZ_SetQueryWithoutTagType(&query, types[1]);
-
-    // Create system
-    YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "AliveSystem", &query, &TestSystem_CountEntities);
-
-    // Create alive entities
-    for (uint32_t i = 0; i < 8; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    }
-
-    // Create dead entities
-    for (uint32_t i = 0; i < 2; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-        YULDUZ_AddTagInECSRegistry(&registry, entity, "Dead");
-    }
-
-    // Run system
-    TestUserData user_data = {0};
-    YULDUZ_RunSystem(&system, &registry, &user_data);
-
-    TEST_ASSERT(user_data.entity_count == 8, "Should only process alive entities");
-
-    YULDUZ_ReleaseSystem(&system);
-    YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_system_component_processing(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 64, 16, 32};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register Position
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_Type pos_type;
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, &pos_type);
+    // Register component
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
 
     // Create query
     YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read);
+    TEST_ASSERT_TRUE(YULDUZ_InitializeQuery(&query, 4));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read));
 
-    // Create system
-    YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "SumSystem", &query, &TestSystem_ProcessPosition);
+    // Create system with UserData
+    SystemTestData data   = {.custom_value = 42};
+    YULDUZ_System  system = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeSystem(&system, "TestSystem", &data, &query, empty_system));
 
-    // Create entities with specific positions
-    float expected_sum = 0.0f;
-    for (uint32_t i = 0; i < 10; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {(float)i * 10.0f, 0.0f, 0.0f};
-        expected_sum += pos.x;
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    }
+    // Verify initialization
+    TEST_ASSERT_NOT_NULL(system.Name);
+    TEST_ASSERT_EQUAL(SDL_strcmp(system.Name, "TestSystem"), 0);
+    TEST_ASSERT_EQUAL(system.UserData, &data);
+    TEST_ASSERT_EQUAL(system.SystemPFN, empty_system);
+    TEST_ASSERT_EQUAL(system.DenseCount, 0);
+    TEST_ASSERT_EQUAL(system.LastArchetypeCount, 0);
 
-    // Run system
-    TestUserData user_data = {0};
-    YULDUZ_RunSystem(&system, &registry, &user_data);
-
-    TEST_ASSERT(user_data.total_x == expected_sum,
-                "Sum mismatch: expected %.2f, got %.2f", expected_sum, user_data.total_x);
-
+    // Release
     YULDUZ_ReleaseSystem(&system);
+    TEST_ASSERT_NULL(system.Name);
+    TEST_ASSERT_NULL(system.Dense);
+
     YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
 }
 
-bool test_system_multiple_runs(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 64, 16, 32};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+// ============================================================
+// SYSTEM EXECUTION TESTS
+// ============================================================
 
-    // Register Position
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_Type pos_type;
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, &pos_type);
+static void test_system_execution_basic(void) {
+    TEST_START("System: Basic Execution");
 
-    // Create query
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
 
-    // Create system
-    YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "TestSystem", &query, &TestSystem_CountEntities);
+    // Register component
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
 
     // Create entities
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    }
-
-    // Run system multiple times
-    TestUserData user_data = {0};
+    TestPosition pos = {1.0f, 2.0f, 3.0f};
     for (uint32_t i = 0; i < 10; i++) {
-        YULDUZ_RunSystem(&system, &registry, &user_data);
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos));
     }
-
-    TEST_ASSERT(user_data.call_count == 10, "System should be called 10 times");
-    TEST_ASSERT(user_data.entity_count == 50, "Should process 5 entities x 10 runs");
-
-    YULDUZ_ReleaseSystem(&system);
-    YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_system_dynamic_archetype_updates(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 64, 16, 32};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register components
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)}};
-
-    YULDUZ_Type types[2];
-    for (uint32_t i = 0; i < 2; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], &types[i]);
-    }
-
-    // Create query for Position + Velocity
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, types[0], YULDUZ_QueryAccessType_Read);
-    YULDUZ_SetQueryWithComponentType(&query, types[1], YULDUZ_QueryAccessType_Read);
 
     // Create system
-    YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "MovementSystem", &query, &TestSystem_CountEntities);
+    YULDUZ_Query query = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeQuery(&query, 4));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read));
 
-    // Create entities with only Position
-    YULDUZ_Entity entities[5];
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Position", &pos);
-    }
+    SystemTestData data   = {0};
+    YULDUZ_System  system = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeSystem(&system, "CountSystem", &data, &query, empty_system));
 
-    // Run system - should find 0 entities
-    TestUserData user_data1 = {0};
-    YULDUZ_RunSystem(&system, &registry, &user_data1);
-    TEST_ASSERT(user_data1.entity_count == 0, "Should find 0 entities initially");
+    // Run system
+    YULDUZ_RunSystem(&system, &ecs);
 
-    // Add Velocity to entities
-    for (uint32_t i = 0; i < 5; i++) {
-        Velocity vel = {1.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Velocity", &vel);
-    }
-
-    // Run system again - should find 5 entities
-    TestUserData user_data2 = {0};
-    YULDUZ_RunSystem(&system, &registry, &user_data2);
-    TEST_ASSERT(user_data2.entity_count == 5, "Should find 5 entities after adding Velocity");
+    // Verify system was called
+    TEST_ASSERT_TRUE(data.was_called);
+    TEST_ASSERT_EQUAL(data.archetype_call_count, 1);  // One archetype: [Position]
+    TEST_ASSERT_EQUAL(data.total_entity_count, 10);   // 10 entities
 
     YULDUZ_ReleaseSystem(&system);
     YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
 }
 
-bool test_system_complex_scenario(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 128, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void test_system_user_data(void) {
+    TEST_START("System: UserData Passed Correctly");
 
-    // Register types
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)},
-        {.Name = "Player", .Size = 0, .Alignment = 0},
-        {.Name = "Enemy", .Size = 0, .Alignment = 0}};
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
 
-    YULDUZ_Type types[5];
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], &types[i]);
-    }
+    // Register component
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
 
-    // Create multiple systems
+    // Create entity
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
 
-    // System 1: All entities with Position
-    YULDUZ_Query query1 = {0};
-    YULDUZ_InitializeQuery(&query1, 16);
-    YULDUZ_SetQueryWithComponentType(&query1, types[0], YULDUZ_QueryAccessType_Read);
+    TestPosition pos = {5.0f, 10.0f, 15.0f};
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos));
 
-    YULDUZ_System system1 = {0};
-    YULDUZ_InitializeSystem(&system1, "AllPositions", &query1, &TestSystem_CountEntities);
+    // Create system with custom UserData
+    YULDUZ_Query query = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeQuery(&query, 4));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Write));
 
-    // System 2: Player entities with Position and Health
-    YULDUZ_Query query2 = {0};
-    YULDUZ_InitializeQuery(&query2, 16);
-    YULDUZ_SetQueryWithComponentType(&query2, types[0], YULDUZ_QueryAccessType_Read);
-    YULDUZ_SetQueryWithComponentType(&query2, types[2], YULDUZ_QueryAccessType_Read);
-    YULDUZ_SetQueryWithTagType(&query2, types[3]);
+    SystemTestData data   = {.delta_time = 0.016f, .custom_value = 999};
+    YULDUZ_System  system = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeSystem(&system, "UpdateSystem", &data, &query, position_update_system));
 
-    YULDUZ_System system2 = {0};
-    YULDUZ_InitializeSystem(&system2, "PlayerHealth", &query2, &TestSystem_CountEntities);
+    // Run system
+    YULDUZ_RunSystem(&system, &ecs);
 
-    // Create varied entities
-    // 5 players with Position, Velocity, Health
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos    = {0.0f, 0.0f, 0.0f};
-        Velocity vel    = {1.0f, 0.0f, 0.0f};
-        Health   health = {100.0f, 100.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Velocity", &vel);
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Health", &health);
-        YULDUZ_AddTagInECSRegistry(&registry, entity, "Player");
-    }
+    // Verify UserData was used
+    TEST_ASSERT_EQUAL(data.archetype_call_count, 1);
+    TEST_ASSERT_EQUAL(data.custom_value, 999);  // Unchanged
 
-    // 10 enemies with Position and Health
-    for (uint32_t i = 0; i < 10; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos    = {0.0f, 0.0f, 0.0f};
-        Health   health = {50.0f, 50.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Health", &health);
-        YULDUZ_AddTagInECSRegistry(&registry, entity, "Enemy");
-    }
+    // Verify position was updated using delta_time
+    TestPosition updated_pos = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &updated_pos));
+    TEST_ASSERT_TRUE(updated_pos.x > 5.0f);  // Should be incremented
+    TEST_ASSERT_TRUE(updated_pos.y > 10.0f);
+    TEST_ASSERT_TRUE(updated_pos.z > 15.0f);
 
-    // 5 static objects with just Position
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    }
-
-    // Run systems
-    TestUserData data1 = {0};
-    YULDUZ_RunSystem(&system1, &registry, &data1);
-    TEST_ASSERT(data1.entity_count == 20, "System1 should find all 20 entities with Position");
-
-    TestUserData data2 = {0};
-    YULDUZ_RunSystem(&system2, &registry, &data2);
-    TEST_ASSERT(data2.entity_count == 5, "System2 should find only 5 player entities");
-
-    YULDUZ_ReleaseSystem(&system1);
-    YULDUZ_ReleaseSystem(&system2);
-    YULDUZ_ReleaseQuery(&query1);
-    YULDUZ_ReleaseQuery(&query2);
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
 }
 
-// ============================================================================
-// Test Runner
-// ============================================================================
+static void test_system_multiple_archetypes(void) {
+    TEST_START("System: Runs on Multiple Matching Archetypes");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register components
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType hp_type  = YULDUZ_INVALID_COMPONENT_TYPE;
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Health", .Size = sizeof(TestHealth), .Alignment = _Alignof(TestHealth), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &hp_type));
+
+    // Create entities in different archetypes:
+    // Archetype 1: [Position] - 5 entities
+    TestPosition pos = {0};
+    for (uint32_t i = 0; i < 5; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e));
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos));
+    }
+
+    // Archetype 2: [Position, Velocity] - 3 entities
+    TestVelocity vel = {0};
+    for (uint32_t i = 0; i < 3; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e));
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos));
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, vel_type, &vel));
+    }
+
+    // Archetype 3: [Position, Health] - 2 entities
+    TestHealth hp = {0};
+    for (uint32_t i = 0; i < 2; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e));
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos));
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, hp_type, &hp));
+    }
+
+    // System queries for Position (all 3 archetypes match)
+    YULDUZ_Query query = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeQuery(&query, 4));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read));
+
+    SystemTestData data   = {0};
+    YULDUZ_System  system = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeSystem(&system, "PositionSystem", &data, &query, empty_system));
+
+    // Run system
+    YULDUZ_RunSystem(&system, &ecs);
+
+    // Verify system ran on all 3 archetypes
+    TEST_ASSERT_EQUAL(data.archetype_call_count, 3);
+    TEST_ASSERT_EQUAL(data.total_entity_count, 10);  // 5 + 3 + 2
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_system_query_filtering(void) {
+    TEST_START("System: Query Filtering (WITH/WITHOUT)");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register components and tags
+    YULDUZ_ComponentType pos_type   = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type   = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_TagType       active_tag = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_TagType       dead_tag   = YULDUZ_INVALID_TAG_TYPE;
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Active", &active_tag));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Dead", &dead_tag));
+
+    TestPosition pos = {0};
+    TestVelocity vel = {0};
+
+    // Entity 1: [Position, Velocity] + [Active] → MATCHES
+    YULDUZ_Entity e1 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e1));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e1, pos_type, &pos));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e1, vel_type, &vel));
+    TEST_ASSERT_TRUE(YULDUZ_AddTagWithTypeInECSRegistry(&ecs, e1, active_tag));
+
+    // Entity 2: [Position, Velocity] + [Active, Dead] → EXCLUDED (has Dead)
+    YULDUZ_Entity e2 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e2));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e2, pos_type, &pos));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e2, vel_type, &vel));
+    TEST_ASSERT_TRUE(YULDUZ_AddTagWithTypeInECSRegistry(&ecs, e2, active_tag));
+    TEST_ASSERT_TRUE(YULDUZ_AddTagWithTypeInECSRegistry(&ecs, e2, dead_tag));
+
+    // Entity 3: [Position, Velocity] (no Active tag) → EXCLUDED (missing Active)
+    YULDUZ_Entity e3 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e3));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e3, pos_type, &pos));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e3, vel_type, &vel));
+
+    // System: WITH Position, Velocity, Active; WITHOUT Dead
+    YULDUZ_Query query = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeQuery(&query, 4));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithComponentType(&query, vel_type, YULDUZ_QueryAccessType_Read));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithTagType(&query, active_tag));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithoutTagType(&query, dead_tag));
+
+    SystemTestData data   = {0};
+    YULDUZ_System  system = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeSystem(&system, "ActiveMovementSystem", &data, &query, empty_system));
+
+    // Run system
+    YULDUZ_RunSystem(&system, &ecs);
+
+    // Only e1's archetype should match
+    TEST_ASSERT_EQUAL(data.archetype_call_count, 1);
+    TEST_ASSERT_EQUAL(data.total_entity_count, 1);
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_system_incremental_cache(void) {
+    TEST_START("System: Incremental Archetype Cache");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register component
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    // Create system
+    YULDUZ_Query query = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeQuery(&query, 4));
+    TEST_ASSERT_TRUE(YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read));
+
+    SystemTestData data   = {0};
+    YULDUZ_System  system = {0};
+    TEST_ASSERT_TRUE(YULDUZ_InitializeSystem(&system, "TestSystem", &data, &query, empty_system));
+
+    // Run 1: No entities
+    YULDUZ_RunSystem(&system, &ecs);
+    TEST_ASSERT_EQUAL(data.archetype_call_count, 0);
+    TEST_ASSERT_EQUAL(system.DenseCount, 0);
+
+    // Create entity (new archetype created)
+    TestPosition  pos = {0};
+    YULDUZ_Entity e1  = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e1));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e1, pos_type, &pos));
+
+    // Run 2: System discovers new archetype
+    data = (SystemTestData){0};
+    YULDUZ_RunSystem(&system, &ecs);
+    TEST_ASSERT_EQUAL(data.archetype_call_count, 1);
+    TEST_ASSERT_EQUAL(data.total_entity_count, 1);
+    TEST_ASSERT_EQUAL(system.DenseCount, 1);  // 1 archetype cached
+
+    // Add more entities to same archetype (no new archetype)
+    YULDUZ_Entity e2 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e2));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e2, pos_type, &pos));
+
+    // Run 3: Same archetype, more entities
+    data = (SystemTestData){0};
+    YULDUZ_RunSystem(&system, &ecs);
+    TEST_ASSERT_EQUAL(data.archetype_call_count, 1);  // Still 1 archetype
+    TEST_ASSERT_EQUAL(data.total_entity_count, 2);    // But 2 entities now
+    TEST_ASSERT_EQUAL(system.DenseCount, 1);          // Cache unchanged
+
+    YULDUZ_ReleaseSystem(&system);
+    YULDUZ_ReleaseQuery(&query);
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+// ============================================================
+// ENTRY POINT
+// ============================================================
 
 void run_all_system_tests(void) {
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("Running System Tests");
-    YULDUZ_LOG_INFO("========================================\n");
+    YULDUZ_LOG_INFO("");
+    YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
+    YULDUZ_LOG_INFO("║           SYSTEM TESTS                                         ║");
+    YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝");
+    YULDUZ_LOG_INFO("");
 
-    uint32_t passed = 0;
-    uint32_t total  = 0;
-
-#define RUN_TEST(test)        \
-    do {                      \
-        total++;              \
-        if (test()) passed++; \
-    } while (0)
-
-    RUN_TEST(test_system_initialize_release);
-    RUN_TEST(test_system_run_empty);
-    RUN_TEST(test_system_with_single_component_query);
-    RUN_TEST(test_system_with_multiple_component_query);
-    RUN_TEST(test_system_with_tag_query);
-    RUN_TEST(test_system_with_exclusion_query);
-    RUN_TEST(test_system_component_processing);
-    RUN_TEST(test_system_multiple_runs);
-    RUN_TEST(test_system_dynamic_archetype_updates);
-    RUN_TEST(test_system_complex_scenario);
-
-#undef RUN_TEST
-
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("System Tests: %u/%u passed", passed, total);
-    YULDUZ_LOG_INFO("========================================\n");
+    test_system_initialization();
+    test_system_execution_basic();
+    test_system_user_data();
+    test_system_multiple_archetypes();
+    test_system_query_filtering();
+    test_system_incremental_cache();
 }

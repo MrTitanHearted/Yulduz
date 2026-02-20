@@ -1,1142 +1,871 @@
+#include <Tests/Tests.h>
 #include <Yulduz/Engine.h>
-#include <SDL3/SDL.h>
 
-// Benchmark helper macros
-#define BENCHMARK_START(name)                              \
-    do {                                                   \
-        YULDUZ_LOG_INFO("BENCHMARK: %s", name);            \
-        uint64_t start_time = SDL_GetPerformanceCounter(); \
-        uint64_t freq       = SDL_GetPerformanceFrequency();
+// ============================================================
+// BENCHMARK TYPES
+// ============================================================
 
-#define BENCHMARK_END()                                              \
-    uint64_t end_time   = SDL_GetPerformanceCounter();               \
-    double   elapsed_ms = ((end_time - start_time) * 1000.0) / freq; \
-    YULDUZ_LOG_INFO("  Time: %.3f ms", elapsed_ms);                  \
-    }                                                                \
-    while (0)
-
-// Helper structures
-typedef struct Position {
+typedef struct TestPosition {
     float x, y, z;
-} Position;
+} TestPosition;
 
-typedef struct Velocity {
+typedef struct TestVelocity {
     float x, y, z;
-} Velocity;
+} TestVelocity;
 
-typedef struct Health {
-    float value;
-    float max_value;
-} Health;
+typedef struct TestHealth {
+    float current, max;
+} TestHealth;
 
-typedef struct Transform {
-    float matrix[16];
-} Transform;
+typedef struct TestDamage {
+    float amount;
+} TestDamage;
 
-// ============================================================================
-// Type Registry Benchmarks
-// ============================================================================
+typedef struct TestSprite {
+    uint32_t texture_id;
+} TestSprite;
 
-void benchmark_type_registry_register_types(void) {
-    BENCHMARK_START("Type Registry - Register 1000 types");
+typedef struct TestTransform {
+    float m[16];
+} TestTransform;
 
-    YULDUZ_TypeRegistry registry = {0};
-    YULDUZ_InitializeTypeRegistry(&registry, 16);
+typedef struct TestLifecycle {
+    uint32_t id;
+    uint32_t value;
+} TestLifecycle;
 
-    char name_buffer[64];
-    for (uint32_t i = 0; i < 1000; i++) {
-        SDL_snprintf(name_buffer, sizeof(name_buffer), "Type_%u", i);
-        YULDUZ_TypeDescription desc = {
-            .Name      = name_buffer,
-            .Size      = 4 + (i % 64),
-            .Alignment = 4};
-        YULDUZ_RegisterTypesInTypeRegistry(&registry, &desc, nullptr, 1);
-    }
+// ============================================================
+// LIFECYCLE HOOKS FOR BENCHMARKING
+// ============================================================
 
-    YULDUZ_ReleaseTypeRegistry(&registry);
+static uint32_t g_hook_call_count = 0;
 
-    BENCHMARK_END();
+static void BenchLifecycle_OnCreate(void *component, void *user_data) {
+    (void)component;
+    (void)user_data;
+    g_hook_call_count++;
 }
 
-void benchmark_type_registry_lookup_types(void) {
-    YULDUZ_TypeRegistry registry = {0};
-    YULDUZ_InitializeTypeRegistry(&registry, 16);
-
-    // Prepare types
-    char name_buffer[64];
-    for (uint32_t i = 0; i < 100; i++) {
-        SDL_snprintf(name_buffer, sizeof(name_buffer), "Type_%u", i);
-        YULDUZ_TypeDescription desc = {
-            .Name      = name_buffer,
-            .Size      = 4,
-            .Alignment = 4};
-        YULDUZ_RegisterTypesInTypeRegistry(&registry, &desc, nullptr, 1);
-    }
-
-    BENCHMARK_START("Type Registry - Lookup 10000 types");
-
-    const char *names[100];
-    YULDUZ_Type types[100];
-
-    for (uint32_t iter = 0; iter < 100; iter++) {
-        for (uint32_t i = 0; i < 100; i++) {
-            SDL_snprintf(name_buffer, sizeof(name_buffer), "Type_%u", i);
-            names[i] = name_buffer;
-        }
-        YULDUZ_GetTypesInTypeRegistry(&registry, names, types, 100);
-    }
-
-    YULDUZ_ReleaseTypeRegistry(&registry);
-
-    BENCHMARK_END();
+static void BenchLifecycle_OnDestroy(void *component, void *user_data) {
+    (void)component;
+    (void)user_data;
+    g_hook_call_count++;
 }
 
-void benchmark_type_registry_sort_types(void) {
-    YULDUZ_TypeRegistry registry = {0};
-    YULDUZ_InitializeTypeRegistry(&registry, 1024);
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
 
-    // Register types
-    YULDUZ_Type types[1000];
-    char        name_buffer[64];
-    for (uint32_t i = 0; i < 1000; i++) {
-        SDL_snprintf(name_buffer, sizeof(name_buffer), "Type_%u", i);
-        YULDUZ_TypeDescription desc = {
-            .Name      = name_buffer,
-            .Size      = 4,
-            .Alignment = 4};
-        YULDUZ_RegisterTypesInTypeRegistry(&registry, &desc, &types[i], 1);
-    }
+static bool setup_bench_ecs(YULDUZ_ECSRegistry *ecs) {
+    YULDUZ_ECSRegistryInitializeInfo info = {
+        .InitialEntityCapacity        = 1024,
+        .InitialTagTypeCapacity       = 32,
+        .InitialComponentTypeCapacity = 32,
+        .InitialArchetypeCapacity     = 128,
+        .InitialArchetypeTypeCapacity = 128,
+    };
 
-    BENCHMARK_START("Type Registry - Sort 1000 types x 1000 times");
-
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_SDL_SortTypes(types, 1000);
-    }
-
-    YULDUZ_ReleaseTypeRegistry(&registry);
-
-    BENCHMARK_END();
+    return YULDUZ_InitializeECSRegistry(ecs, &info);
 }
 
-// ============================================================================
-// Entity Registry Benchmarks
-// ============================================================================
+// ============================================================
+// ENTITY BENCHMARKS
+// ============================================================
 
-void benchmark_entity_registry_create_entities(void) {
-    BENCHMARK_START("Entity Registry - Create 100,000 entities");
+static void bench_entity_create_destroy(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_InitializeEntityRegistry(&registry, 1024);
+    const uint32_t ITERATIONS = 1000000;
 
-    for (uint32_t i = 0; i < 100000; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInEntityRegistry(&registry, i % 10, i % 100, &entity);
+    BENCHMARK_START("Entity: Create/Destroy (no components)", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+        YULDUZ_DestroyEntityInECSRegistry(&ecs, entity);
     }
 
-    YULDUZ_ReleaseEntityRegistry(&registry);
+    BENCHMARK_END("Entity: Create/Destroy");
 
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_entity_registry_create_destroy_cycle(void) {
-    BENCHMARK_START("Entity Registry - Create/Destroy cycle 50,000 times");
+static void bench_entity_create_batch(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_InitializeEntityRegistry(&registry, 1024);
+    const uint32_t ITERATIONS = 100000;
 
-    for (uint32_t i = 0; i < 50000; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entity);
-        YULDUZ_DestroyEntityInEntityRegistry(&registry, entity);
+    BENCHMARK_START("Entity: Batch Create", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
     }
 
-    YULDUZ_ReleaseEntityRegistry(&registry);
+    BENCHMARK_END("Entity: Batch Create");
 
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_entity_registry_get_records(void) {
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_InitializeEntityRegistry(&registry, 100000);
-
-    // Create entities
-    YULDUZ_Entity entities[10000];
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_CreateEntityInEntityRegistry(&registry, i % 10, i % 100, &entities[i]);
-    }
-
-    BENCHMARK_START("Entity Registry - Get 10,000 entity records x 1000 times");
-
-    YULDUZ_EntityRecord records[10000];
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_GetEntityRecordsInEntityRegistry(&registry, entities, records, 10000);
-    }
-
-    YULDUZ_ReleaseEntityRegistry(&registry);
-
-    BENCHMARK_END();
-}
-
-void benchmark_entity_registry_set_records(void) {
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_InitializeEntityRegistry(&registry, 100000);
-
-    // Create entities
-    YULDUZ_Entity entities[10000];
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entities[i]);
-    }
-
-    BENCHMARK_START("Entity Registry - Set 10,000 entity records x 1000 times");
-
-    YULDUZ_EntityRecord records[10000];
-    for (uint32_t i = 0; i < 10000; i++) {
-        records[i].ArchetypeType  = i % 10;
-        records[i].ArchetypeIndex = i % 100;
-    }
-
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_SetEntityRecordsInEntityRegistry(&registry, entities, records, 10000);
-    }
-
-    YULDUZ_ReleaseEntityRegistry(&registry);
-
-    BENCHMARK_END();
-}
-
-void benchmark_entity_registry_fragmentation(void) {
-    BENCHMARK_START("Entity Registry - Fragmentation test (create 10000, destroy 5000, create 5000)");
-
-    YULDUZ_EntityRegistry registry = {0};
-    YULDUZ_InitializeEntityRegistry(&registry, 1024);
-
-    YULDUZ_Entity entities[10000];
-
-    // Create 10000 entities
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_CreateEntityInEntityRegistry(&registry, 0, 0, &entities[i]);
-    }
-
-    // Destroy every other entity
-    for (uint32_t i = 0; i < 10000; i += 2) {
-        YULDUZ_DestroyEntityInEntityRegistry(&registry, entities[i]);
-    }
-
-    // Create 5000 new entities (should reuse)
-    for (uint32_t i = 0; i < 5000; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInEntityRegistry(&registry, 1, 1, &entity);
-    }
-
-    YULDUZ_ReleaseEntityRegistry(&registry);
-
-    BENCHMARK_END();
-}
-
-// ============================================================================
-// Archetype Benchmarks
-// ============================================================================
-
-void benchmark_archetype_add_entities(void) {
-    YULDUZ_TypeRegistry type_registry = {0};
-    YULDUZ_InitializeTypeRegistry(&type_registry, 16);
-
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_Type type;
-    YULDUZ_RegisterTypesInTypeRegistry(&type_registry, &desc, &type, 1);
-
-    YULDUZ_TypeInfo type_info = {
-        .Type      = type,
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_Archetype archetype = {0};
-    YULDUZ_InitializeArchetype(&archetype, &type_info, 1, nullptr, 0, 1024);
-
-    BENCHMARK_START("Archetype - Add 50,000 entities");
-
-    Position            pos       = {0};
-    YULDUZ_TypeDataInfo data_info = {.Type = type, .Data = &pos};
-
-    for (uint32_t i = 0; i < 50000; i++) {
-        pos.x = (float)i;
-        pos.y = (float)i * 2;
-        pos.z = (float)i * 3;
-        YULDUZ_ArchetypeIndex index;
-        YULDUZ_AddInArchetype(&archetype, i, &data_info, &index);
-    }
-
-    YULDUZ_ReleaseArchetype(&archetype);
-    YULDUZ_ReleaseTypeRegistry(&type_registry);
-
-    BENCHMARK_END();
-}
-
-void benchmark_archetype_remove_entities(void) {
-    YULDUZ_TypeRegistry type_registry = {0};
-    YULDUZ_InitializeTypeRegistry(&type_registry, 16);
-
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_Type type;
-    YULDUZ_RegisterTypesInTypeRegistry(&type_registry, &desc, &type, 1);
-
-    YULDUZ_TypeInfo type_info = {
-        .Type      = type,
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_Archetype archetype = {0};
-    YULDUZ_InitializeArchetype(&archetype, &type_info, 1, nullptr, 0, 100000);
-
-    // Add entities
-    Position            pos       = {0};
-    YULDUZ_TypeDataInfo data_info = {.Type = type, .Data = &pos};
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_ArchetypeIndex index;
-        YULDUZ_AddInArchetype(&archetype, i, &data_info, &index);
-    }
-
-    BENCHMARK_START("Archetype - Remove 10,000 entities");
-
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_Entity moved;
-        YULDUZ_RemoveInArchetype(&archetype, 0, &moved);
-    }
-
-    YULDUZ_ReleaseArchetype(&archetype);
-    YULDUZ_ReleaseTypeRegistry(&type_registry);
-
-    BENCHMARK_END();
-}
-
-void benchmark_archetype_component_access(void) {
-    YULDUZ_TypeRegistry type_registry = {0};
-    YULDUZ_InitializeTypeRegistry(&type_registry, 16);
-
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_Type type;
-    YULDUZ_RegisterTypesInTypeRegistry(&type_registry, &desc, &type, 1);
-
-    YULDUZ_TypeInfo type_info = {
-        .Type      = type,
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_Archetype archetype = {0};
-    YULDUZ_InitializeArchetype(&archetype, &type_info, 1, nullptr, 0, 100000);
-
-    // Add entities
-    Position            pos       = {0};
-    YULDUZ_TypeDataInfo data_info = {.Type = type, .Data = &pos};
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_ArchetypeIndex index;
-        YULDUZ_AddInArchetype(&archetype, i, &data_info, &index);
-    }
-
-    BENCHMARK_START("Archetype - Access 10,000 components x 1000 iterations");
-
-    YULDUZ_ComponentStore *store = YULDUZ_QueryStoreInArchetype(&archetype, type);
-    float                  sum   = 0.0f;
-
-    for (uint32_t iter = 0; iter < 1000; iter++) {
-        for (uint32_t i = 0; i < 10000; i++) {
-            Position *p = (Position *)YULDUZ_GetComponentInComponentStore(store, i);
-            sum += p->x + p->y + p->z;
-        }
-    }
-
-    YULDUZ_LOG_INFO("  Sum (prevent optimization): %.2f", sum);
-
-    YULDUZ_ReleaseArchetype(&archetype);
-    YULDUZ_ReleaseTypeRegistry(&type_registry);
-
-    BENCHMARK_END();
-}
-
-void benchmark_archetype_multi_component(void) {
-    YULDUZ_TypeRegistry type_registry = {0};
-    YULDUZ_InitializeTypeRegistry(&type_registry, 16);
-
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)}};
-
-    YULDUZ_Type types[3];
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_RegisterTypesInTypeRegistry(&type_registry, &descs[i], &types[i], 1);
-    }
-    YULDUZ_SDL_SortTypes(types, 3);
-
-    YULDUZ_TypeInfo type_infos[3];
-    for (uint32_t i = 0; i < 3; i++) {
-        type_infos[i].Type      = types[i];
-        type_infos[i].Size      = descs[i].Size;
-        type_infos[i].Alignment = descs[i].Alignment;
-    }
-    YULDUZ_SDL_SortTypeInfos(type_infos, 3);
-
-    YULDUZ_Archetype archetype = {0};
-    YULDUZ_InitializeArchetype(&archetype, type_infos, 3, nullptr, 0, 100000);
-
-    BENCHMARK_START("Archetype - Add 20,000 entities with 3 components");
-
-    Position pos    = {0};
-    Velocity vel    = {0};
-    Health   health = {100.0f, 100.0f};
-
-    YULDUZ_TypeDataInfo data_infos[3] = {
-        {.Type = types[0], .Data = &pos},
-        {.Type = types[1], .Data = &vel},
-        {.Type = types[2], .Data = &health}};
-    YULDUZ_SDL_SortTypeDataInfos(data_infos, 3);
-
-    for (uint32_t i = 0; i < 20000; i++) {
-        YULDUZ_ArchetypeIndex index;
-        YULDUZ_AddInArchetype(&archetype, i, data_infos, &index);
-    }
-
-    YULDUZ_ReleaseArchetype(&archetype);
-    YULDUZ_ReleaseTypeRegistry(&type_registry);
-
-    BENCHMARK_END();
-}
-
-// ============================================================================
-// ECS Registry Benchmarks
-// ============================================================================
-
-void benchmark_ecs_registry_entity_creation(void) {
-    BENCHMARK_START("ECS Registry - Create 50,000 entities");
-
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {64, 100000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    for (uint32_t i = 0; i < 50000; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-    }
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-
-    BENCHMARK_END();
-}
-
-void benchmark_ecs_registry_add_components(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {64, 100000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register type
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
-
-    // Create entities
-    YULDUZ_Entity entities[10000];
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
-    }
-
-    BENCHMARK_START("ECS Registry - Add component to 10,000 entities");
-
-    Position pos = {0};
-    for (uint32_t i = 0; i < 10000; i++) {
-        pos.x = (float)i;
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Position", &pos);
-    }
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-
-    BENCHMARK_END();
-}
-
-void benchmark_ecs_registry_get_set_components(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {64, 100000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
-
-    // Setup entities with components
-    YULDUZ_Entity entities[5000];
-    Position      pos = {0};
-    for (uint32_t i = 0; i < 5000; i++) {
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Position", &pos);
-    }
-
-    BENCHMARK_START("ECS Registry - Get/Set components 5000 entities x 200 iterations");
-
-    for (uint32_t iter = 0; iter < 200; iter++) {
-        for (uint32_t i = 0; i < 5000; i++) {
-            Position retrieved;
-            YULDUZ_GetComponentInECSRegistry(&registry, entities[i], "Position", &retrieved);
-            retrieved.x += 1.0f;
-            YULDUZ_SetComponentInECSRegistry(&registry, entities[i], "Position", &retrieved);
-        }
-    }
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-
-    BENCHMARK_END();
-}
-
-void benchmark_ecs_registry_archetype_transitions(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {64, 100000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register types
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)}};
-
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], nullptr);
-    }
-
-    // Create entities
+static void bench_entity_generation_reuse(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
+
+    // Pre-create and destroy entities to fill free list
     YULDUZ_Entity entities[1000];
     for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &entities[i]);
     }
-
-    BENCHMARK_START("ECS Registry - Archetype transitions (1000 entities, 3 components)");
-
-    Position pos    = {0};
-    Velocity vel    = {0};
-    Health   health = {100.0f, 100.0f};
-
-    // Add Position
     for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Position", &pos);
+        YULDUZ_DestroyEntityInECSRegistry(&ecs, entities[i]);
     }
 
-    // Add Velocity
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Velocity", &vel);
+    const uint32_t ITERATIONS = 1000000;
+
+    BENCHMARK_START("Entity: Create (with generation reuse)", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+        YULDUZ_DestroyEntityInECSRegistry(&ecs, entity);
     }
 
-    // Add Health
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Health", &health);
-    }
+    BENCHMARK_END("Entity: Create (reuse)");
 
-    // Remove components
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_RemoveComponentInECSRegistry(&registry, entities[i], "Velocity");
-    }
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_ecs_registry_complex_scenario(void) {
-    BENCHMARK_START("ECS Registry - Complex scenario (10,000 entities, mixed operations)");
+// ============================================================
+// COMPONENT BENCHMARKS (NO HOOKS)
+// ============================================================
 
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {64, 20000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void bench_component_add_remove_pod(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    // Register types
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)},
-        {.Name = "Transform", .Size = sizeof(Transform), .Alignment = alignof(Transform)},
-        {.Name = "Player", .Size = 0, .Alignment = 0},
-        {.Name = "Enemy", .Size = 0, .Alignment = 0}};
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
 
-    for (uint32_t i = 0; i < 6; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], nullptr);
+    // Create entity
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+
+    const uint32_t ITERATIONS = 1000000;
+    TestPosition   pos        = {1.0f, 2.0f, 3.0f};
+
+    BENCHMARK_START("Component: Add/Remove POD (no hooks)", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos);
+        YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, pos_type);
     }
 
-    // Create entities with various component combinations
-    YULDUZ_Entity entities[10000];
-    Position      pos    = {0};
-    Velocity      vel    = {0};
-    Health        health = {100.0f, 100.0f};
+    BENCHMARK_END("Component: Add/Remove POD");
 
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
-
-        // All have position
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Position", &pos);
-
-        // 50% have velocity
-        if (i % 2 == 0) {
-            YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Velocity", &vel);
-        }
-
-        // 75% have health
-        if (i % 4 != 0) {
-            YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Health", &health);
-        }
-
-        // Tags
-        if (i % 10 == 0) {
-            YULDUZ_AddTagInECSRegistry(&registry, entities[i], "Player");
-        } else if (i % 3 == 0) {
-            YULDUZ_AddTagInECSRegistry(&registry, entities[i], "Enemy");
-        }
-    }
-
-    // Simulate game loop updates
-    for (uint32_t frame = 0; frame < 10; frame++) {
-        for (uint32_t i = 0; i < 10000; i++) {
-            Position p;
-            if (YULDUZ_GetComponentInECSRegistry(&registry, entities[i], "Position", &p)) {
-                p.x += 1.0f;
-                YULDUZ_SetComponentInECSRegistry(&registry, entities[i], "Position", &p);
-            }
-        }
-    }
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-// ============================================================================
-// Benchmark Runner
-// ============================================================================
+static void bench_component_add_with_hooks(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-void run_all_type_registry_benchmarks(void) {
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("Type Registry Benchmarks");
-    YULDUZ_LOG_INFO("========================================\n");
+    g_hook_call_count = 0;
 
-    benchmark_type_registry_register_types();
-    benchmark_type_registry_lookup_types();
-    benchmark_type_registry_sort_types();
-}
+    YULDUZ_ComponentType lc_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Lifecycle", .Size = sizeof(TestLifecycle), .Alignment = _Alignof(TestLifecycle), .OnCreatePFN = BenchLifecycle_OnCreate, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &lc_type);
 
-void run_all_entity_registry_benchmarks(void) {
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("Entity Registry Benchmarks");
-    YULDUZ_LOG_INFO("========================================\n");
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
 
-    benchmark_entity_registry_create_entities();
-    benchmark_entity_registry_create_destroy_cycle();
-    benchmark_entity_registry_get_records();
-    benchmark_entity_registry_set_records();
-    benchmark_entity_registry_fragmentation();
-}
+    const uint32_t ITERATIONS = 1000000;
+    TestLifecycle  lc         = {0};
 
-void run_all_archetype_benchmarks(void) {
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("Archetype Benchmarks");
-    YULDUZ_LOG_INFO("========================================\n");
+    BENCHMARK_START("Component: Add with OnCreate hook", ITERATIONS);
 
-    benchmark_archetype_add_entities();
-    benchmark_archetype_remove_entities();
-    benchmark_archetype_component_access();
-    benchmark_archetype_multi_component();
-}
-
-void run_all_ecs_registry_benchmarks(void) {
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("ECS Registry Benchmarks");
-    YULDUZ_LOG_INFO("========================================\n");
-
-    benchmark_ecs_registry_entity_creation();
-    benchmark_ecs_registry_add_components();
-    benchmark_ecs_registry_get_set_components();
-    benchmark_ecs_registry_archetype_transitions();
-    benchmark_ecs_registry_complex_scenario();
-}
-
-// ============================================================================
-// Query Benchmarks
-// ============================================================================
-
-void benchmark_query_creation(void) {
-    YULDUZ_TypeRegistry type_registry = {0};
-    YULDUZ_InitializeTypeRegistry(&type_registry, 16);
-
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)}};
-
-    YULDUZ_Type types[3];
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_RegisterTypesInTypeRegistry(&type_registry, &descs[i], &types[i], 1);
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, lc_type, &lc);
+        YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, lc_type);
     }
 
-    BENCHMARK_START("Query - Create 10,000 complex queries");
+    BENCHMARK_END("Component: Add with hook");
 
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_Query query = {0};
-        YULDUZ_InitializeQuery(&query, 16);
-        YULDUZ_SetQueryWithComponentType(&query, types[0], YULDUZ_QueryAccessType_Read);
-        YULDUZ_SetQueryWithComponentType(&query, types[1], YULDUZ_QueryAccessType_Write);
-        YULDUZ_SetQueryWithComponentType(&query, types[2], YULDUZ_QueryAccessType_Read);
-        YULDUZ_ReleaseQuery(&query);
-    }
+    YULDUZ_LOG_INFO("  Hook called %u times", g_hook_call_count);
 
-    YULDUZ_ReleaseTypeRegistry(&type_registry);
-
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_query_archetype_matching(void) {
-    YULDUZ_TypeRegistry type_registry = {0};
-    YULDUZ_InitializeTypeRegistry(&type_registry, 16);
+static void bench_component_remove_with_hooks(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)}};
+    g_hook_call_count = 0;
 
-    YULDUZ_Type types[3];
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_RegisterTypesInTypeRegistry(&type_registry, &descs[i], &types[i], 1);
-    }
-    YULDUZ_SDL_SortTypes(types, 3);
+    YULDUZ_ComponentType lc_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Lifecycle", .Size = sizeof(TestLifecycle), .Alignment = _Alignof(TestLifecycle), .OnCreatePFN = NULL, .OnDestroyPFN = BenchLifecycle_OnDestroy, .OnClonePFN = NULL, .UserData = NULL}, &lc_type);
 
-    // Create archetype
-    YULDUZ_TypeInfo type_infos[3];
-    for (uint32_t i = 0; i < 3; i++) {
-        type_infos[i].Type      = types[i];
-        type_infos[i].Size      = descs[i].Size;
-        type_infos[i].Alignment = descs[i].Alignment;
-    }
-    YULDUZ_SDL_SortTypeInfos(type_infos, 3);
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
 
-    YULDUZ_Archetype archetype = {0};
-    YULDUZ_InitializeArchetype(&archetype, type_infos, 3, NULL, 0, 16);
+    const uint32_t ITERATIONS = 1000000;
+    TestLifecycle  lc         = {0};
 
-    // Create query
-    YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, types[0], YULDUZ_QueryAccessType_Read);
-    YULDUZ_SetQueryWithComponentType(&query, types[1], YULDUZ_QueryAccessType_Write);
+    BENCHMARK_START("Component: Remove with OnDestroy hook", ITERATIONS);
 
-    YULDUZ_QueryInfo info = {0};
-    YULDUZ_CreateQueryInfo(&info, &query);
-
-    BENCHMARK_START("Query - Archetype matching 1,000,000 times");
-
-    uint32_t match_count = 0;
-    for (uint32_t i = 0; i < 1000000; i++) {
-        if (YULDUZ_ArchetypeSupportsQueryInfo(&info, &archetype)) {
-            match_count++;
-        }
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, lc_type, &lc);
+        YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, lc_type);
     }
 
-    YULDUZ_LOG_INFO("  Matches: %u", match_count);
+    BENCHMARK_END("Component: Remove with hook");
 
-    YULDUZ_DestroyQueryInfo(&info);
-    YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseArchetype(&archetype);
-    YULDUZ_ReleaseTypeRegistry(&type_registry);
+    YULDUZ_LOG_INFO("  Hook called %u times", g_hook_call_count);
 
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_query_deep_copy(void) {
-    YULDUZ_TypeRegistry type_registry = {0};
-    YULDUZ_InitializeTypeRegistry(&type_registry, 16);
+static void bench_component_get_set(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)}};
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
 
-    YULDUZ_Type types[2];
-    for (uint32_t i = 0; i < 2; i++) {
-        YULDUZ_RegisterTypesInTypeRegistry(&type_registry, &descs[i], &types[i], 1);
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+
+    TestPosition pos = {1.0f, 2.0f, 3.0f};
+    YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos);
+
+    const uint32_t ITERATIONS = 10000000;
+    TestPosition   retrieved  = {0};
+
+    BENCHMARK_START("Component: Get", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved);
     }
 
-    YULDUZ_Query src_query = {0};
-    YULDUZ_InitializeQuery(&src_query, 16);
-    YULDUZ_SetQueryWithComponentType(&src_query, types[0], YULDUZ_QueryAccessType_Read);
-    YULDUZ_SetQueryWithComponentType(&src_query, types[1], YULDUZ_QueryAccessType_Write);
+    BENCHMARK_END("Component: Get");
 
-    BENCHMARK_START("Query - Deep copy 50,000 times");
+    // Set benchmark
+    BENCHMARK_START("Component: Set", ITERATIONS);
 
-    for (uint32_t i = 0; i < 50000; i++) {
-        YULDUZ_Query dst_query = {0};
-        YULDUZ_DeepCopyQuery(&src_query, &dst_query);
-        YULDUZ_ReleaseQuery(&dst_query);
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        pos.x += 1.0f;
+        YULDUZ_SetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos);
     }
 
-    YULDUZ_ReleaseQuery(&src_query);
-    YULDUZ_ReleaseTypeRegistry(&type_registry);
+    BENCHMARK_END("Component: Set");
 
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-// ============================================================================
-// System Benchmarks
-// ============================================================================
+// ============================================================
+// TAG BENCHMARKS
+// ============================================================
 
-typedef struct BenchUserData {
-    uint32_t call_count;
-    uint32_t entity_count;
-} BenchUserData;
+static void bench_tag_add_remove(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-void BenchSystem_Empty(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
-    (void)archetype;
+    YULDUZ_TagType tag = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "TestTag", &tag);
+
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+
+    const uint32_t ITERATIONS = 1000000;
+
+    BENCHMARK_START("Tag: Add/Remove", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_AddTagWithTypeInECSRegistry(&ecs, entity, tag);
+        YULDUZ_RemoveTagWithTypeInECSRegistry(&ecs, entity, tag);
+    }
+
+    BENCHMARK_END("Tag: Add/Remove");
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+}
+
+static void bench_tag_has_query(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
+
+    YULDUZ_TagType tag = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "TestTag", &tag);
+
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+    YULDUZ_AddTagWithTypeInECSRegistry(&ecs, entity, tag);
+
+    const uint32_t ITERATIONS = 10000000;
+
+    BENCHMARK_START("Tag: Has Query", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, tag);
+    }
+
+    BENCHMARK_END("Tag: Has Query");
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+}
+
+// ============================================================
+// ARCHETYPE BENCHMARKS
+// ============================================================
+
+static void bench_archetype_transitions(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
+
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType hp_type  = YULDUZ_INVALID_COMPONENT_TYPE;
+
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
+
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type);
+
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Health", .Size = sizeof(TestHealth), .Alignment = _Alignof(TestHealth), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &hp_type);
+
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+
+    TestPosition pos = {0};
+    TestVelocity vel = {0};
+    TestHealth   hp  = {0};
+
+    const uint32_t ITERATIONS = 100000;
+
+    BENCHMARK_START("Archetype: Add Component Transitions", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        // [] → [Pos] → [Pos,Vel] → [Pos,Vel,HP]
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &vel);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, hp_type, &hp);
+
+        // [Pos,Vel,HP] → [Pos,Vel] → [Pos] → []
+        YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, hp_type);
+        YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, vel_type);
+        YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, pos_type);
+    }
+
+    BENCHMARK_END("Archetype: Transitions");
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+}
+
+static void bench_archetype_edge_caching(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
+
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
+
+    // Pre-warm the edge cache
+    YULDUZ_Entity warmup = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &warmup);
+    TestPosition pos = {0};
+    YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, warmup, pos_type, &pos);
+    YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, warmup, pos_type);
+
+    // Now benchmark with cached edges
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+
+    const uint32_t ITERATIONS = 1000000;
+
+    BENCHMARK_START("Archetype: Edge Cache Hit", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos);
+        YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, pos_type);
+    }
+
+    BENCHMARK_END("Archetype: Edge Cache");
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+}
+
+// ============================================================
+// SYSTEM BENCHMARKS
+// ============================================================
+
+static uint64_t g_system_entity_count = 0;
+
+static void bench_system_callback(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
     (void)query;
     (void)user_data;
+    g_system_entity_count += archetype->DenseCount;
 }
 
-void BenchSystem_Count(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
-    (void)query;
-    BenchUserData *data = (BenchUserData *)user_data;
-    data->call_count++;
-    data->entity_count += archetype->DenseCount;
-}
+static void bench_system_cold_start(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-void BenchSystem_ProcessComponents(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
-    (void)user_data;
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
 
-    Position *positions  = NULL;
-    Velocity *velocities = NULL;
+    // Create 50 archetypes with entities
+    TestPosition pos = {0};
+    for (uint32_t i = 0; i < 50; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &e);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos);
 
-    for (uint32_t i = 0; i < archetype->StoreCount; i++) {
-        for (uint32_t q = 0; q < query->WithComponentCount; q++) {
-            if (archetype->Stores[i].Type == query->WithComponentTypes[q]) {
-                if (q == 0) {
-                    positions = (Position *)archetype->Stores[i].Dense;
-                } else if (q == 1) {
-                    velocities = (Velocity *)archetype->Stores[i].Dense;
-                }
-            }
-        }
+        // Add tag to create different archetypes
+        char tag_name[32];
+        SDL_snprintf(tag_name, sizeof(tag_name), "Tag%u", i);
+        YULDUZ_TagType tag = YULDUZ_INVALID_TAG_TYPE;
+        YULDUZ_RegisterTagTypeInECSRegistry(&ecs, tag_name, &tag);
+        YULDUZ_AddTagWithTypeInECSRegistry(&ecs, e, tag);
     }
 
-    if (positions && velocities) {
-        for (uint32_t i = 0; i < archetype->DenseCount; i++) {
-            positions[i].x += velocities[i].x * 0.016f;
-            positions[i].y += velocities[i].y * 0.016f;
-            positions[i].z += velocities[i].z * 0.016f;
-        }
-    }
-}
+    const uint32_t ITERATIONS = 10000;
 
-void benchmark_system_initialization(void) {
-    YULDUZ_TypeRegistry type_registry = {0};
-    YULDUZ_InitializeTypeRegistry(&type_registry, 16);
+    BENCHMARK_START("System: Cold Start (50 archetypes)", ITERATIONS);
 
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_Type type;
-    YULDUZ_RegisterTypesInTypeRegistry(&type_registry, &desc, &type, 1);
-
-    BENCHMARK_START("System - Initialize/Release 10,000 systems");
-
-    for (uint32_t i = 0; i < 10000; i++) {
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
         YULDUZ_Query query = {0};
-        YULDUZ_InitializeQuery(&query, 16);
-        YULDUZ_SetQueryWithComponentType(&query, type, YULDUZ_QueryAccessType_Read);
+        YULDUZ_InitializeQuery(&query, 4);
+        YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read);
 
         YULDUZ_System system = {0};
-        YULDUZ_InitializeSystem(&system, "BenchSystem", &query, &BenchSystem_Empty);
+        YULDUZ_InitializeSystem(&system, "BenchSystem", NULL, &query, bench_system_callback);
+
+        g_system_entity_count = 0;
+        YULDUZ_RunSystem(&system, &ecs);
 
         YULDUZ_ReleaseSystem(&system);
         YULDUZ_ReleaseQuery(&query);
     }
 
-    YULDUZ_ReleaseTypeRegistry(&type_registry);
+    BENCHMARK_END("System: Cold Start");
 
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_system_iteration_empty_entities(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 100000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void bench_system_warm_execution(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_Type type;
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, &type);
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
 
+    // Create 10,000 entities in same archetype
+    TestPosition pos = {0};
+    for (uint32_t i = 0; i < 10000; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &e);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos);
+    }
+
+    // Create system
     YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_InitializeQuery(&query, 4);
+    YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read);
 
     YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "BenchSystem", &query, &BenchSystem_Count);
+    YULDUZ_InitializeSystem(&system, "BenchSystem", NULL, &query, bench_system_callback);
 
-    // Create 10,000 entities
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
+    // Warm up
+    YULDUZ_RunSystem(&system, &ecs);
+
+    const uint32_t ITERATIONS = 10000000;
+    g_system_entity_count     = 0;
+
+    BENCHMARK_START("System: Warm Execution (10k entities)", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_RunSystem(&system, &ecs);
     }
 
-    BENCHMARK_START("System - Iterate 10,000 entities x 1000 times");
+    BENCHMARK_END("System: Warm Execution");
 
-    BenchUserData user_data = {0};
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_RunSystem(&system, &registry, &user_data);
-    }
-
-    YULDUZ_LOG_INFO("  Total entities processed: %u", user_data.entity_count);
+    YULDUZ_LOG_INFO("  Processed %llu entities total", (unsigned long long)g_system_entity_count);
 
     YULDUZ_ReleaseSystem(&system);
     YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_system_component_processing(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 100000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void bench_system_with_filtering(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)}};
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
 
-    YULDUZ_Type types[2];
-    for (uint32_t i = 0; i < 2; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], &types[i]);
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
+
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type);
+
+    YULDUZ_TagType active_tag = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_TagType dead_tag   = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Active", &active_tag);
+    YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Dead", &dead_tag);
+
+    TestPosition pos = {0};
+    TestVelocity vel = {0};
+
+    // Create entities with different configurations
+    // 1000 with [Pos, Vel, Active] (matches)
+    for (uint32_t i = 0; i < 1000; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &e);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, vel_type, &vel);
+        YULDUZ_AddTagWithTypeInECSRegistry(&ecs, e, active_tag);
     }
 
+    // 1000 with [Pos, Vel, Dead] (filtered out)
+    for (uint32_t i = 0; i < 1000; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &e);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, vel_type, &vel);
+        YULDUZ_AddTagWithTypeInECSRegistry(&ecs, e, dead_tag);
+    }
+
+    // 1000 with [Pos] (no Vel, filtered out)
+    for (uint32_t i = 0; i < 1000; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &e);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos);
+        YULDUZ_AddTagWithTypeInECSRegistry(&ecs, e, active_tag);
+    }
+
+    // Query: WITH Pos, Vel, Active; WITHOUT Dead
     YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
-    YULDUZ_SetQueryWithComponentType(&query, types[0], YULDUZ_QueryAccessType_Write);
-    YULDUZ_SetQueryWithComponentType(&query, types[1], YULDUZ_QueryAccessType_Read);
+    YULDUZ_InitializeQuery(&query, 8);
+    YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&query, vel_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithTagType(&query, active_tag);
+    YULDUZ_SetQueryWithoutTagType(&query, dead_tag);
 
     YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "MovementSystem", &query, &BenchSystem_ProcessComponents);
+    YULDUZ_InitializeSystem(&system, "FilterSystem", NULL, &query, bench_system_callback);
 
-    // Create 10,000 entities with Position and Velocity
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0.0f, 0.0f, 0.0f};
-        Velocity vel = {1.0f, 1.0f, 1.0f};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Velocity", &vel);
+    // Warm up
+    YULDUZ_RunSystem(&system, &ecs);
+
+    const uint32_t ITERATIONS = 1000000;
+    g_system_entity_count     = 0;
+
+    BENCHMARK_START("System: With Filtering (3k entities, 1k match)", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_RunSystem(&system, &ecs);
     }
 
-    BENCHMARK_START("System - Process 10,000 entities (movement) x 1000 frames");
+    BENCHMARK_END("System: With Filtering");
 
-    BenchUserData user_data = {0};
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_RunSystem(&system, &registry, &user_data);
-    }
+    YULDUZ_LOG_INFO("  Processed %llu entities total", (unsigned long long)g_system_entity_count);
 
     YULDUZ_ReleaseSystem(&system);
     YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_system_with_filtering(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 100000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+// ============================================================
+// LARGE-SCALE BENCHMARKS
+// ============================================================
 
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Player", .Size = 0, .Alignment = 0},
-        {.Name = "Dead", .Size = 0, .Alignment = 0}};
+static void bench_large_scale_entity_creation(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    YULDUZ_Type types[3];
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], &types[i]);
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
+
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
+
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type);
+
+    const uint32_t ENTITY_COUNT = 100000;
+    TestPosition   pos          = {0};
+    TestVelocity   vel          = {0};
+
+    BENCHMARK_START("Large Scale: Create 100k Entities with Components", ENTITY_COUNT);
+
+    for (uint32_t i = 0; i < ENTITY_COUNT; i++) {
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &entity);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos);
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &vel);
     }
 
+    BENCHMARK_END("Large Scale: Creation");
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+}
+
+static void bench_large_scale_system_iteration(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
+
+    YULDUZ_ComponentType types[5];
+
+    for (uint32_t i = 0; i < 5; i++) {
+        char name[32];
+        SDL_snprintf(name, sizeof(name), "Component%u", i);
+
+        YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = name, .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &types[i]);
+    }
+
+    // Create 10,000 entities across multiple archetypes
+    TestPosition data = {0};
+    for (uint32_t i = 0; i < 10000; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &e);
+
+        // Add components based on bit pattern
+        uint32_t pattern = i % 32;
+        for (uint32_t j = 0; j < 5; j++) {
+            if ((pattern & (1u << j)) != 0) {
+                YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, types[j], &data);
+            }
+        }
+    }
+
+    // Query for Component0
     YULDUZ_Query query = {0};
-    YULDUZ_InitializeQuery(&query, 16);
+    YULDUZ_InitializeQuery(&query, 4);
     YULDUZ_SetQueryWithComponentType(&query, types[0], YULDUZ_QueryAccessType_Read);
-    YULDUZ_SetQueryWithTagType(&query, types[1]);
-    YULDUZ_SetQueryWithoutTagType(&query, types[2]);
 
     YULDUZ_System system = {0};
-    YULDUZ_InitializeSystem(&system, "PlayerSystem", &query, &BenchSystem_Count);
+    YULDUZ_InitializeSystem(&system, "LargeSystem", NULL, &query, bench_system_callback);
 
-    // Create 1000 alive players
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-        YULDUZ_AddTagInECSRegistry(&registry, entity, "Player");
+    // Warm up
+    YULDUZ_RunSystem(&system, &ecs);
+
+    const uint32_t ITERATIONS = 100000;
+    g_system_entity_count     = 0;
+
+    BENCHMARK_START("Large Scale: System Iteration (10k entities, multi-archetype)", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_RunSystem(&system, &ecs);
     }
 
-    // Create 500 dead players
-    for (uint32_t i = 0; i < 500; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-        YULDUZ_AddTagInECSRegistry(&registry, entity, "Player");
-        YULDUZ_AddTagInECSRegistry(&registry, entity, "Dead");
-    }
+    BENCHMARK_END("Large Scale: System");
 
-    // Create 8500 other entities
-    for (uint32_t i = 0; i < 8500; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-        Position pos = {0};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    }
-
-    BENCHMARK_START("System - Filter 10,000 entities (1000 match) x 1000 times");
-
-    BenchUserData user_data = {0};
-    for (uint32_t i = 0; i < 1000; i++) {
-        YULDUZ_RunSystem(&system, &registry, &user_data);
-    }
-
-    YULDUZ_LOG_INFO("  Entities matched: %u", user_data.entity_count / 1000);
+    YULDUZ_LOG_INFO("  Processed %llu entities total", (unsigned long long)g_system_entity_count);
 
     YULDUZ_ReleaseSystem(&system);
     YULDUZ_ReleaseQuery(&query);
-    YULDUZ_ReleaseECSRegistry(&registry);
-
-    BENCHMARK_END();
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-void benchmark_multiple_systems(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 100000, 32, 64};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void bench_realistic_game_frame(void) {
+    YULDUZ_ECSRegistry ecs = {0};
+    setup_bench_ecs(&ecs);
 
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)}};
+    // Register components
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType hp_type  = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType dmg_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType spr_type = YULDUZ_INVALID_COMPONENT_TYPE;
 
-    YULDUZ_Type types[3];
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], &types[i]);
-    }
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type);
 
-    // Create 3 systems
-    YULDUZ_Query  queries[3] = {0};
-    YULDUZ_System systems[3] = {0};
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type);
 
-    // System 1: Position only
-    YULDUZ_InitializeQuery(&queries[0], 16);
-    YULDUZ_SetQueryWithComponentType(&queries[0], types[0], YULDUZ_QueryAccessType_Read);
-    YULDUZ_InitializeSystem(&systems[0], "PosSystem", &queries[0], &BenchSystem_Count);
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Health", .Size = sizeof(TestHealth), .Alignment = _Alignof(TestHealth), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &hp_type);
 
-    // System 2: Position + Velocity
-    YULDUZ_InitializeQuery(&queries[1], 16);
-    YULDUZ_SetQueryWithComponentType(&queries[1], types[0], YULDUZ_QueryAccessType_Write);
-    YULDUZ_SetQueryWithComponentType(&queries[1], types[1], YULDUZ_QueryAccessType_Read);
-    YULDUZ_InitializeSystem(&systems[1], "MoveSystem", &queries[1], &BenchSystem_Count);
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Damage", .Size = sizeof(TestDamage), .Alignment = _Alignof(TestDamage), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &dmg_type);
 
-    // System 3: Health
-    YULDUZ_InitializeQuery(&queries[2], 16);
-    YULDUZ_SetQueryWithComponentType(&queries[2], types[2], YULDUZ_QueryAccessType_Read);
-    YULDUZ_InitializeSystem(&systems[2], "HealthSystem", &queries[2], &BenchSystem_Count);
+    YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Sprite", .Size = sizeof(TestSprite), .Alignment = _Alignof(TestSprite), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &spr_type);
 
-    // Create varied entities
-    for (uint32_t i = 0; i < 10000; i++) {
-        YULDUZ_Entity entity;
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+    YULDUZ_TagType active_tag = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_TagType dead_tag   = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Active", &active_tag);
+    YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Dead", &dead_tag);
 
-        Position pos = {0};
-        YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
+    // Create 1000 entities with various configurations
+    TestPosition pos = {0};
+    TestVelocity vel = {0};
+    TestHealth   hp  = {100.0f, 100.0f};
+    TestDamage   dmg = {10.0f};
+    TestSprite   spr = {1};
 
+    for (uint32_t i = 0; i < 1000; i++) {
+        YULDUZ_Entity e = YULDUZ_INVALID_ENTITY;
+        YULDUZ_CreateEntityInECSRegistry(&ecs, &e);
+
+        // All have Position
+        YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, pos_type, &pos);
+
+        // 80% have Velocity
+        if (i % 10 < 8) {
+            YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, vel_type, &vel);
+        }
+
+        // 60% have Health
+        if (i % 10 < 6) {
+            YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, hp_type, &hp);
+        }
+
+        // 30% have Damage
+        if (i % 10 < 3) {
+            YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, dmg_type, &dmg);
+        }
+
+        // 50% have Sprite
         if (i % 2 == 0) {
-            Velocity vel = {1.0f, 0.0f, 0.0f};
-            YULDUZ_AddComponentInECSRegistry(&registry, entity, "Velocity", &vel);
+            YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e, spr_type, &spr);
         }
 
-        if (i % 3 == 0) {
-            Health health = {100.0f, 100.0f};
-            YULDUZ_AddComponentInECSRegistry(&registry, entity, "Health", &health);
-        }
-    }
-
-    BENCHMARK_START("System - Run 3 systems on 10,000 entities x 500 frames");
-
-    BenchUserData user_data = {0};
-    for (uint32_t frame = 0; frame < 500; frame++) {
-        for (uint32_t i = 0; i < 3; i++) {
-            YULDUZ_RunSystem(&systems[i], &registry, &user_data);
+        // 90% are Active
+        if (i % 10 < 9) {
+            YULDUZ_AddTagWithTypeInECSRegistry(&ecs, e, active_tag);
         }
     }
 
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_ReleaseSystem(&systems[i]);
-        YULDUZ_ReleaseQuery(&queries[i]);
+    // Create 5 systems (typical game frame)
+    // Movement System
+    YULDUZ_Query movement_query = {0};
+    YULDUZ_InitializeQuery(&movement_query, 4);
+    YULDUZ_SetQueryWithComponentType(&movement_query, pos_type, YULDUZ_QueryAccessType_Write);
+    YULDUZ_SetQueryWithComponentType(&movement_query, vel_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithTagType(&movement_query, active_tag);
+
+    YULDUZ_System movement_system = {0};
+    YULDUZ_InitializeSystem(&movement_system, "Movement", NULL, &movement_query, bench_system_callback);
+
+    // Render System
+    YULDUZ_Query render_query = {0};
+    YULDUZ_InitializeQuery(&render_query, 4);
+    YULDUZ_SetQueryWithComponentType(&render_query, pos_type, YULDUZ_QueryAccessType_Read);
+    YULDUZ_SetQueryWithComponentType(&render_query, spr_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System render_system = {0};
+    YULDUZ_InitializeSystem(&render_system, "Render", NULL, &render_query, bench_system_callback);
+
+    // Health System
+    YULDUZ_Query health_query = {0};
+    YULDUZ_InitializeQuery(&health_query, 4);
+    YULDUZ_SetQueryWithComponentType(&health_query, hp_type, YULDUZ_QueryAccessType_Write);
+    YULDUZ_SetQueryWithTagType(&health_query, active_tag);
+    YULDUZ_SetQueryWithoutTagType(&health_query, dead_tag);
+
+    YULDUZ_System health_system = {0};
+    YULDUZ_InitializeSystem(&health_system, "Health", NULL, &health_query, bench_system_callback);
+
+    // Damage System
+    YULDUZ_Query damage_query = {0};
+    YULDUZ_InitializeQuery(&damage_query, 4);
+    YULDUZ_SetQueryWithComponentType(&damage_query, hp_type, YULDUZ_QueryAccessType_Write);
+    YULDUZ_SetQueryWithComponentType(&damage_query, dmg_type, YULDUZ_QueryAccessType_Read);
+
+    YULDUZ_System damage_system = {0};
+    YULDUZ_InitializeSystem(&damage_system, "Damage", NULL, &damage_query, bench_system_callback);
+
+    // Cleanup System
+    YULDUZ_Query cleanup_query = {0};
+    YULDUZ_InitializeQuery(&cleanup_query, 4);
+    YULDUZ_SetQueryWithTagType(&cleanup_query, dead_tag);
+
+    YULDUZ_System cleanup_system = {0};
+    YULDUZ_InitializeSystem(&cleanup_system, "Cleanup", NULL, &cleanup_query, bench_system_callback);
+
+    // Warm up all systems
+    YULDUZ_RunSystem(&movement_system, &ecs);
+    YULDUZ_RunSystem(&render_system, &ecs);
+    YULDUZ_RunSystem(&health_system, &ecs);
+    YULDUZ_RunSystem(&damage_system, &ecs);
+    YULDUZ_RunSystem(&cleanup_system, &ecs);
+
+    const uint32_t ITERATIONS = 100000;
+    g_system_entity_count     = 0;
+
+    BENCHMARK_START("Realistic: Full Game Frame (5 systems, 1k entities)", ITERATIONS);
+
+    for (uint32_t i = 0; i < ITERATIONS; i++) {
+        YULDUZ_RunSystem(&movement_system, &ecs);
+        YULDUZ_RunSystem(&render_system, &ecs);
+        YULDUZ_RunSystem(&health_system, &ecs);
+        YULDUZ_RunSystem(&damage_system, &ecs);
+        YULDUZ_RunSystem(&cleanup_system, &ecs);
     }
-    YULDUZ_ReleaseECSRegistry(&registry);
 
-    BENCHMARK_END();
+    BENCHMARK_END("Realistic: Game Frame");
+
+    YULDUZ_LOG_INFO("  Processed %llu entities total", (unsigned long long)g_system_entity_count);
+
+    // Cleanup
+    YULDUZ_ReleaseSystem(&movement_system);
+    YULDUZ_ReleaseSystem(&render_system);
+    YULDUZ_ReleaseSystem(&health_system);
+    YULDUZ_ReleaseSystem(&damage_system);
+    YULDUZ_ReleaseSystem(&cleanup_system);
+
+    YULDUZ_ReleaseQuery(&movement_query);
+    YULDUZ_ReleaseQuery(&render_query);
+    YULDUZ_ReleaseQuery(&health_query);
+    YULDUZ_ReleaseQuery(&damage_query);
+    YULDUZ_ReleaseQuery(&cleanup_query);
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
 }
 
-// ============================================================================
-// Benchmark Runners
-// ============================================================================
+// ============================================================
+// ENTRY POINT
+// ============================================================
 
-void run_all_query_benchmarks(void) {
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("Query Benchmarks");
-    YULDUZ_LOG_INFO("========================================\n");
+void run_all_ecs_benchmarks(void) {
+    YULDUZ_LOG_INFO("");
+    YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
+    YULDUZ_LOG_INFO("║           ECS COMPREHENSIVE BENCHMARKS                         ║");
+    YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝");
+    YULDUZ_LOG_INFO("");
 
-    benchmark_query_creation();
-    benchmark_query_archetype_matching();
-    benchmark_query_deep_copy();
-}
+    // Entity benchmarks
+    YULDUZ_LOG_INFO("--- Entity Operations ---");
+    bench_entity_create_destroy();
+    bench_entity_create_batch();
+    bench_entity_generation_reuse();
+    YULDUZ_LOG_INFO("");
 
-void run_all_system_benchmarks(void) {
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("System Benchmarks");
-    YULDUZ_LOG_INFO("========================================\n");
+    // Component benchmarks
+    YULDUZ_LOG_INFO("--- Component Operations ---");
+    bench_component_add_remove_pod();
+    bench_component_add_with_hooks();
+    bench_component_remove_with_hooks();
+    bench_component_get_set();
+    YULDUZ_LOG_INFO("");
 
-    benchmark_system_initialization();
-    benchmark_system_iteration_empty_entities();
-    benchmark_system_component_processing();
-    benchmark_system_with_filtering();
-    benchmark_multiple_systems();
-}
+    // Tag benchmarks
+    YULDUZ_LOG_INFO("--- Tag Operations ---");
+    bench_tag_add_remove();
+    bench_tag_has_query();
+    YULDUZ_LOG_INFO("");
 
-void run_all_benchmarks(void) {
-    YULDUZ_LOG_INFO("\n");
-    YULDUZ_LOG_INFO("================================================================================");
-    YULDUZ_LOG_INFO("                         ECS FRAMEWORK BENCHMARKS");
-    YULDUZ_LOG_INFO("================================================================================\n");
+    // Archetype benchmarks
+    YULDUZ_LOG_INFO("--- Archetype Operations ---");
+    bench_archetype_transitions();
+    bench_archetype_edge_caching();
+    YULDUZ_LOG_INFO("");
 
-    run_all_type_registry_benchmarks();
-    run_all_entity_registry_benchmarks();
-    run_all_archetype_benchmarks();
-    run_all_ecs_registry_benchmarks();
-    run_all_query_benchmarks();
-    run_all_system_benchmarks();
+    // System benchmarks
+    YULDUZ_LOG_INFO("--- System Execution ---");
+    bench_system_cold_start();
+    bench_system_warm_execution();
+    bench_system_with_filtering();
+    YULDUZ_LOG_INFO("");
 
-    YULDUZ_LOG_INFO("\n");
-    YULDUZ_LOG_INFO("================================================================================");
-    YULDUZ_LOG_INFO("                      BENCHMARKS COMPLETED");
-    YULDUZ_LOG_INFO("================================================================================\n");
+    // Large-scale benchmarks
+    YULDUZ_LOG_INFO("--- Large-Scale Scenarios ---");
+    bench_large_scale_entity_creation();
+    bench_large_scale_system_iteration();
+    bench_realistic_game_frame();
+    YULDUZ_LOG_INFO("");
+
+    PRINT_BENCHMARK_RESULTS();
 }

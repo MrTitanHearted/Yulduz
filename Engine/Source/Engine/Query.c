@@ -5,25 +5,25 @@ void YULDUZ_EnsureWithTagCapacityInQuery(YULDUZ_Query *query);
 void YULDUZ_EnsureWithoutComponentCapacityInQuery(YULDUZ_Query *query);
 void YULDUZ_EnsureWithoutTagCapacityInQuery(YULDUZ_Query *query);
 
-bool YULDUZ_InitializeQuery(YULDUZ_Query *query, uint32_t initial_component_capacity) {
+bool YULDUZ_InitializeQuery(YULDUZ_Query *query, uint32_t initial_capacity) {
     SDL_zerop(query);
 
-    query->WithComponentCapacity    = initial_component_capacity;
+    query->WithComponentCapacity    = initial_capacity;
     query->WithComponentCount       = 0;
-    query->WithComponentAccessTypes = SDL_malloc(sizeof(YULDUZ_QueryAccessType) * initial_component_capacity);
-    query->WithComponentTypes       = SDL_malloc(sizeof(YULDUZ_Type) * initial_component_capacity);
+    query->WithComponentAccessTypes = SDL_malloc(sizeof(YULDUZ_QueryAccessType) * initial_capacity);
+    query->WithComponentTypes       = SDL_malloc(sizeof(YULDUZ_ComponentType) * initial_capacity);
 
-    query->WithTagCapacity = initial_component_capacity;
-    query->WithTagCount    = 0;
-    query->WithTagTypes    = SDL_malloc(sizeof(YULDUZ_Type) * initial_component_capacity);
-
-    query->WithoutComponentCapacity = initial_component_capacity;
+    query->WithoutComponentCapacity = initial_capacity;
     query->WithoutComponentCount    = 0;
-    query->WithoutComponentTypes    = SDL_malloc(sizeof(YULDUZ_Type) * initial_component_capacity);
+    query->WithoutComponentTypes    = SDL_malloc(sizeof(YULDUZ_ComponentType) * initial_capacity);
 
-    query->WithoutTagCapacity = initial_component_capacity;
+    query->WithTagCapacity = initial_capacity;
+    query->WithTagCount    = 0;
+    query->WithTagTypes    = SDL_malloc(sizeof(YULDUZ_TagType) * initial_capacity);
+
+    query->WithoutTagCapacity = initial_capacity;
     query->WithoutTagCount    = 0;
-    query->WithoutTagTypes    = SDL_malloc(sizeof(YULDUZ_Type) * initial_component_capacity);
+    query->WithoutTagTypes    = SDL_malloc(sizeof(YULDUZ_TagType) * initial_capacity);
 
     return true;
 }
@@ -31,14 +31,15 @@ bool YULDUZ_InitializeQuery(YULDUZ_Query *query, uint32_t initial_component_capa
 void YULDUZ_ReleaseQuery(YULDUZ_Query *query) {
     SDL_free(query->WithComponentAccessTypes);
     SDL_free(query->WithComponentTypes);
-    SDL_free(query->WithTagTypes);
     SDL_free(query->WithoutComponentTypes);
+    SDL_free(query->WithTagTypes);
     SDL_free(query->WithoutTagTypes);
 
     SDL_zerop(query);
 }
 
-bool YULDUZ_SetQueryWithComponentType(YULDUZ_Query *query, YULDUZ_Type type, YULDUZ_QueryAccessType access_type) {
+bool YULDUZ_SetQueryWithComponentType(
+    YULDUZ_Query *query, YULDUZ_ComponentType type, YULDUZ_QueryAccessType access_type) {
     YULDUZ_EnsureWithComponentCapacityInQuery(query);
     uint32_t new_component = query->WithComponentCount;
     query->WithComponentCount++;
@@ -48,7 +49,7 @@ bool YULDUZ_SetQueryWithComponentType(YULDUZ_Query *query, YULDUZ_Type type, YUL
     return true;
 }
 
-bool YULDUZ_SetQueryWithoutComponentType(YULDUZ_Query *query, YULDUZ_Type type) {
+bool YULDUZ_SetQueryWithoutComponentType(YULDUZ_Query *query, YULDUZ_ComponentType type) {
     YULDUZ_EnsureWithoutComponentCapacityInQuery(query);
     uint32_t new_component = query->WithoutComponentCount;
     query->WithoutComponentCount++;
@@ -57,7 +58,7 @@ bool YULDUZ_SetQueryWithoutComponentType(YULDUZ_Query *query, YULDUZ_Type type) 
     return true;
 }
 
-bool YULDUZ_SetQueryWithTagType(YULDUZ_Query *query, YULDUZ_Type type) {
+bool YULDUZ_SetQueryWithTagType(YULDUZ_Query *query, YULDUZ_TagType type) {
     YULDUZ_EnsureWithTagCapacityInQuery(query);
 
     uint32_t new_tag = query->WithTagCount;
@@ -67,7 +68,7 @@ bool YULDUZ_SetQueryWithTagType(YULDUZ_Query *query, YULDUZ_Type type) {
     return true;
 }
 
-bool YULDUZ_SetQueryWithoutTagType(YULDUZ_Query *query, YULDUZ_Type type) {
+bool YULDUZ_SetQueryWithoutTagType(YULDUZ_Query *query, YULDUZ_TagType type) {
     YULDUZ_EnsureWithoutTagCapacityInQuery(query);
 
     uint32_t new_tag = query->WithoutTagCount;
@@ -81,32 +82,30 @@ bool YULDUZ_DeepCopyQuery(const YULDUZ_Query *src_query, YULDUZ_Query *dst_query
     *dst_query = *src_query;
 
     dst_query->WithComponentAccessTypes = SDL_malloc(sizeof(YULDUZ_QueryAccessType) * dst_query->WithComponentCapacity);
-    dst_query->WithComponentTypes       = SDL_malloc(sizeof(YULDUZ_Type) * dst_query->WithComponentCapacity);
+    dst_query->WithComponentTypes       = SDL_malloc(sizeof(YULDUZ_ComponentType) * dst_query->WithComponentCapacity);
+    dst_query->WithoutComponentTypes    = SDL_malloc(sizeof(YULDUZ_ComponentType) * dst_query->WithoutComponentCapacity);
 
-    dst_query->WithTagTypes = SDL_malloc(sizeof(YULDUZ_Type) * dst_query->WithTagCapacity);
-
-    dst_query->WithoutComponentTypes = SDL_malloc(sizeof(YULDUZ_Type) * dst_query->WithoutComponentCapacity);
-
-    dst_query->WithoutTagTypes = SDL_malloc(sizeof(YULDUZ_Type) * dst_query->WithoutTagCapacity);
+    dst_query->WithTagTypes    = SDL_malloc(sizeof(YULDUZ_TagType) * dst_query->WithTagCapacity);
+    dst_query->WithoutTagTypes = SDL_malloc(sizeof(YULDUZ_TagType) * dst_query->WithoutTagCapacity);
 
     SDL_memcpy(
         dst_query->WithComponentAccessTypes, src_query->WithComponentAccessTypes,
         sizeof(YULDUZ_QueryAccessType) * src_query->WithComponentCount);
     SDL_memcpy(
         dst_query->WithComponentTypes, src_query->WithComponentTypes,
-        sizeof(YULDUZ_Type) * src_query->WithComponentCount);
-
-    SDL_memcpy(
-        dst_query->WithTagTypes, src_query->WithTagTypes,
-        sizeof(YULDUZ_Type) * src_query->WithTagCount);
+        sizeof(YULDUZ_ComponentType) * src_query->WithComponentCount);
 
     SDL_memcpy(
         dst_query->WithoutComponentTypes, src_query->WithoutComponentTypes,
-        sizeof(YULDUZ_Type) * src_query->WithoutComponentCount);
+        sizeof(YULDUZ_ComponentType) * src_query->WithoutComponentCount);
+
+    SDL_memcpy(
+        dst_query->WithTagTypes, src_query->WithTagTypes,
+        sizeof(YULDUZ_TagType) * src_query->WithTagCount);
 
     SDL_memcpy(
         dst_query->WithoutTagTypes, src_query->WithoutTagTypes,
-        sizeof(YULDUZ_Type) * src_query->WithoutTagCount);
+        sizeof(YULDUZ_TagType) * src_query->WithoutTagCount);
 
     return true;
 }
@@ -117,31 +116,33 @@ bool YULDUZ_CreateQueryInfo(YULDUZ_QueryInfo *info, const YULDUZ_Query *query) {
     info->WithComponentCount = query->WithComponentCount;
     info->WithComponentTypes = nullptr;
     if (info->WithComponentCount > 0) {
-        info->WithComponentTypes = SDL_malloc(sizeof(YULDUZ_Type) * info->WithComponentCount);
+        info->WithComponentTypes = SDL_malloc(sizeof(YULDUZ_ComponentType) * info->WithComponentCount);
         SDL_memcpy(
-            info->WithComponentTypes, query->WithComponentTypes, sizeof(YULDUZ_Type) * info->WithComponentCount);
-    }
-
-    info->WithTagCount = query->WithTagCount;
-    info->WithTagTypes = nullptr;
-    if (info->WithTagCount > 0) {
-        info->WithTagTypes = SDL_malloc(sizeof(YULDUZ_Type) * info->WithTagCount);
-        SDL_memcpy(info->WithTagTypes, query->WithTagTypes, sizeof(YULDUZ_Type) * info->WithTagCount);
+            info->WithComponentTypes, query->WithComponentTypes,
+            sizeof(YULDUZ_ComponentType) * info->WithComponentCount);
     }
 
     info->WithoutComponentCount = query->WithoutComponentCount;
     info->WithoutComponentTypes = nullptr;
     if (info->WithoutComponentCount > 0) {
-        info->WithoutComponentTypes = SDL_malloc(sizeof(YULDUZ_Type) * info->WithoutComponentCount);
+        info->WithoutComponentTypes = SDL_malloc(sizeof(YULDUZ_ComponentType) * info->WithoutComponentCount);
         SDL_memcpy(
-            info->WithoutComponentTypes, query->WithoutComponentTypes, sizeof(YULDUZ_Type) * info->WithoutComponentCount);
+            info->WithoutComponentTypes, query->WithoutComponentTypes,
+            sizeof(YULDUZ_ComponentType) * info->WithoutComponentCount);
+    }
+
+    info->WithTagCount = query->WithTagCount;
+    info->WithTagTypes = nullptr;
+    if (info->WithTagCount > 0) {
+        info->WithTagTypes = SDL_malloc(sizeof(YULDUZ_TagType) * info->WithTagCount);
+        SDL_memcpy(info->WithTagTypes, query->WithTagTypes, sizeof(YULDUZ_TagType) * info->WithTagCount);
     }
 
     info->WithoutTagCount = query->WithoutTagCount;
     info->WithoutTagTypes = nullptr;
     if (info->WithoutTagCount > 0) {
-        info->WithoutTagTypes = SDL_malloc(sizeof(YULDUZ_Type) * info->WithoutTagCount);
-        SDL_memcpy(info->WithoutTagTypes, query->WithoutTagTypes, sizeof(YULDUZ_Type) * info->WithoutTagCount);
+        info->WithoutTagTypes = SDL_malloc(sizeof(YULDUZ_TagType) * info->WithoutTagCount);
+        SDL_memcpy(info->WithoutTagTypes, query->WithoutTagTypes, sizeof(YULDUZ_TagType) * info->WithoutTagCount);
     }
 
     return true;
@@ -196,8 +197,8 @@ void YULDUZ_EnsureWithComponentCapacityInQuery(YULDUZ_Query *query) {
 
     YULDUZ_QueryAccessType *new_access_types = SDL_realloc(
         query->WithComponentAccessTypes, sizeof(YULDUZ_QueryAccessType) * new_capacity);
-    YULDUZ_Type *new_component_types = SDL_realloc(
-        query->WithComponentTypes, sizeof(YULDUZ_Type) * new_capacity);
+    YULDUZ_ComponentType *new_component_types = SDL_realloc(
+        query->WithComponentTypes, sizeof(YULDUZ_ComponentType) * new_capacity);
 
     query->WithComponentCapacity    = new_capacity;
     query->WithComponentAccessTypes = new_access_types;
@@ -212,7 +213,7 @@ void YULDUZ_EnsureWithTagCapacityInQuery(YULDUZ_Query *query) {
     uint32_t old_capacity = query->WithTagCapacity;
     uint32_t new_capacity = old_capacity * 2;
 
-    YULDUZ_Type *new_tag_types = SDL_realloc(query->WithTagTypes, sizeof(YULDUZ_Type) * new_capacity);
+    YULDUZ_ComponentType *new_tag_types = SDL_realloc(query->WithTagTypes, sizeof(YULDUZ_ComponentType) * new_capacity);
 
     query->WithTagCapacity = new_capacity;
     query->WithTagTypes    = new_tag_types;
@@ -225,7 +226,8 @@ void YULDUZ_EnsureWithoutComponentCapacityInQuery(YULDUZ_Query *query) {
     uint32_t old_capacity = query->WithoutComponentCapacity;
     uint32_t new_capacity = old_capacity * 2;
 
-    YULDUZ_Type *new_component_types = SDL_realloc(query->WithoutComponentTypes, sizeof(YULDUZ_Type) * new_capacity);
+    YULDUZ_TagType *new_component_types = SDL_realloc(
+        query->WithoutComponentTypes, sizeof(YULDUZ_TagType) * new_capacity);
 
     query->WithoutComponentCapacity = new_capacity;
     query->WithoutComponentTypes    = new_component_types;
@@ -239,7 +241,8 @@ void YULDUZ_EnsureWithoutTagCapacityInQuery(YULDUZ_Query *query) {
     uint32_t old_capacity = query->WithoutTagCapacity;
     uint32_t new_capacity = old_capacity * 2;
 
-    YULDUZ_Type *new_tag_types = SDL_realloc(query->WithoutTagTypes, sizeof(YULDUZ_Type) * new_capacity);
+    YULDUZ_TagType *new_tag_types = SDL_realloc(
+        query->WithoutTagTypes, sizeof(YULDUZ_TagType) * new_capacity);
 
     query->WithoutTagCapacity = new_capacity;
     query->WithoutTagTypes    = new_tag_types;

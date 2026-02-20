@@ -3,10 +3,11 @@
 void YULDUZ_EnsureDenseCapacityInSystem(YULDUZ_System *system);
 
 bool YULDUZ_InitializeSystem(
-    YULDUZ_System *system, const char *name, const YULDUZ_Query *query, YULDUZ_SystemPFN system_pfn) {
+    YULDUZ_System *system, const char *name, void *user_data, const YULDUZ_Query *query, YULDUZ_SystemPFN system_pfn) {
     SDL_zerop(system);
 
-    system->Name = SDL_strdup(name);
+    system->UserData = user_data;
+    system->Name     = SDL_strdup(name);
     if (!YULDUZ_CreateQueryInfo(&system->Query, query)) {
         return false;
     }
@@ -29,7 +30,7 @@ void YULDUZ_ReleaseSystem(YULDUZ_System *system) {
     SDL_zerop(system);
 }
 
-void YULDUZ_RunSystem(YULDUZ_System *system, const YULDUZ_ECSRegistry *registry, void *user_data) {
+void YULDUZ_RunSystem(YULDUZ_System *system, const YULDUZ_ECSRegistry *registry) {
     uint32_t archetype_count;
 
     YULDUZ_GetArchetypeCountInECSRegistry(registry, &archetype_count);
@@ -54,7 +55,8 @@ void YULDUZ_RunSystem(YULDUZ_System *system, const YULDUZ_ECSRegistry *registry,
     }
 
     for (uint32_t i = 0; i < system->DenseCount; i++) {
-        (system->SystemPFN)(YULDUZ_GetArchetypeInECSRegistry(registry, system->Dense[i]), &system->Query, user_data);
+        (system->SystemPFN)(
+            YULDUZ_GetArchetypeInECSRegistry(registry, system->Dense[i]), &system->Query, system->UserData);
     }
 }
 

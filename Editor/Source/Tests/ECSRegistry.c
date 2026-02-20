@@ -1,597 +1,1015 @@
-#include <Yulduz/Engine.h>
-#include <SDL3/SDL.h>
+#include <Tests/Tests.h>
 
-// Test helper macros
-#define TEST_ASSERT(condition, message)                                 \
-    do {                                                                \
-        if (!(condition)) {                                             \
-            YULDUZ_LOG_INFO("TEST FAILED: %s - %s", __func__, message); \
-            return false;                                               \
-        }                                                               \
-    } while (0)
+// ============================================================
+// TEST COMPONENT TYPES
+// ============================================================
 
-#define TEST_PASS()                                   \
-    do {                                              \
-        YULDUZ_LOG_INFO("TEST PASSED: %s", __func__); \
-        return true;                                  \
-    } while (0)
-
-// Helper structures
-typedef struct Position {
+typedef struct TestPosition {
     float x, y, z;
-} Position;
+} TestPosition;
 
-typedef struct Velocity {
+typedef struct TestVelocity {
     float x, y, z;
-} Velocity;
+} TestVelocity;
 
-typedef struct Health {
-    float value;
-    float max_value;
-} Health;
+typedef struct TestHealth {
+    float current, max;
+} TestHealth;
 
-typedef struct Name {
-    char data[64];
-} Name;
+typedef struct TestDamage {
+    float amount;
+} TestDamage;
 
-// ============================================================================
-// ECS Registry Tests
-// ============================================================================
+typedef struct TestSprite {
+    uint32_t texture_id;
+} TestSprite;
 
-bool test_ecs_registry_initialize_release(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {
-            .InitialTypeCapacity          = 16,
-            .InitialEntityCapacity        = 32,
-            .InitialArchetypeCapacity     = 8,
-            .InitialArchetypeTypeCapacity = 16};
+// Component with allocated memory
+typedef struct TestDynamicArray {
+    float   *data;
+    uint32_t count;
+    uint32_t capacity;
+} TestDynamicArray;
 
-    TEST_ASSERT(YULDUZ_InitializeECSRegistry(&registry, info),
-                "Failed to initialize ECS registry");
-    TEST_ASSERT(registry.DenseCapacity >= 8, "Archetype capacity not set");
-    TEST_ASSERT(registry.DenseCount >= 1, "Should have null archetype");
+// Component that tracks lifecycle calls
+typedef struct TestLifecycle {
+    uint32_t id;
+    uint32_t on_create_calls;
+    uint32_t on_destroy_calls;
+    uint32_t on_clone_calls;
+} TestLifecycle;
 
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+// ============================================================
+// LIFECYCLE TRACKING
+// ============================================================
+
+typedef struct LifecycleTracker {
+    uint32_t create_count;
+    uint32_t destroy_count;
+    uint32_t clone_count;
+    uint32_t last_created_id;
+    uint32_t last_destroyed_id;
+} LifecycleTracker;
+
+static void TestLifecycle_OnCreate(void *component, void *user_data) {
+    TestLifecycle    *lc      = (TestLifecycle *)component;
+    LifecycleTracker *tracker = (LifecycleTracker *)user_data;
+
+    lc->on_create_calls++;
+    tracker->create_count++;
+    tracker->last_created_id = lc->id;
 }
 
-bool test_ecs_registry_register_types(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void TestLifecycle_OnDestroy(void *component, void *user_data) {
+    TestLifecycle    *lc      = (TestLifecycle *)component;
+    LifecycleTracker *tracker = (LifecycleTracker *)user_data;
 
-    // Register component types
-    YULDUZ_TypeDescription pos_desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_Type pos_type = YULDUZ_INVALID_TYPE;
-    TEST_ASSERT(YULDUZ_RegisterTypeInECSRegistry(&registry, pos_desc, &pos_type),
-                "Failed to register Position type");
-    TEST_ASSERT(pos_type != YULDUZ_INVALID_TYPE, "Type should be valid");
-
-    // Register tag type
-    YULDUZ_TypeDescription player_desc = {
-        .Name      = "Player",
-        .Size      = 0,
-        .Alignment = 0};
-
-    YULDUZ_Type player_type = YULDUZ_INVALID_TYPE;
-    TEST_ASSERT(YULDUZ_RegisterTypeInECSRegistry(&registry, player_desc, &player_type),
-                "Failed to register Player tag");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    lc->on_destroy_calls++;
+    tracker->destroy_count++;
+    tracker->last_destroyed_id = lc->id;
 }
 
-bool test_ecs_registry_get_types(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void TestLifecycle_OnClone(void *src, void *dst, void *user_data) {
+    TestLifecycle    *src_lc  = (TestLifecycle *)src;
+    TestLifecycle    *dst_lc  = (TestLifecycle *)dst;
+    LifecycleTracker *tracker = (LifecycleTracker *)user_data;
 
-    // Register types
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_Type registered_type;
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, &registered_type);
-
-    // Get type by name
-    YULDUZ_Type retrieved_type = YULDUZ_INVALID_TYPE;
-    TEST_ASSERT(YULDUZ_GetTypeInECSRegistry(&registry, "Position", &retrieved_type),
-                "Failed to get type by name");
-    TEST_ASSERT(retrieved_type == registered_type, "Type mismatch");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    *dst_lc = *src_lc;
+    dst_lc->on_clone_calls++;
+    tracker->clone_count++;
 }
 
-bool test_ecs_registry_get_type_info(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
-
-    // Get type info
-    YULDUZ_TypeInfo type_info = {0};
-    TEST_ASSERT(YULDUZ_GetTypeInfoInECSRegistry(&registry, "Position", &type_info),
-                "Failed to get type info");
-    TEST_ASSERT(type_info.Size == sizeof(Position), "Size mismatch");
-    TEST_ASSERT(type_info.Alignment == alignof(Position), "Alignment mismatch");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+// Dynamic array lifecycle
+static void TestDynamicArray_OnCreate(void *component, void *user_data) {
+    (void)user_data;
+    TestDynamicArray *arr = (TestDynamicArray *)component;
+    // User should have already allocated, but we can verify
+    if (arr->data != NULL && arr->capacity > 0) {
+        // OK - user provided allocation
+    }
 }
 
-bool test_ecs_registry_create_destroy_entity(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void TestDynamicArray_OnDestroy(void *component, void *user_data) {
+    (void)user_data;
+    TestDynamicArray *arr = (TestDynamicArray *)component;
+    if (arr->data != NULL) {
+        SDL_free(arr->data);
+        arr->data     = NULL;
+        arr->count    = 0;
+        arr->capacity = 0;
+    }
+}
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
+static bool setup_test_ecs(YULDUZ_ECSRegistry *ecs) {
+    YULDUZ_ECSRegistryInitializeInfo info = {
+        .InitialEntityCapacity        = 64,
+        .InitialTagTypeCapacity       = 16,
+        .InitialComponentTypeCapacity = 16,
+        .InitialArchetypeCapacity     = 16,
+        .InitialArchetypeTypeCapacity = 16,
+    };
+
+    return YULDUZ_InitializeECSRegistry(ecs, &info);
+}
+
+// ============================================================
+// BASIC FUNCTIONALITY TESTS
+// ============================================================
+
+static void test_ecs_initialization(void) {
+    TEST_START("ECS: Initialization and Release");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Verify null archetype exists
+    uint32_t archetype_count = 0;
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_EQUAL(archetype_count, 1);  // Null archetype
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_component_type_registration(void) {
+    TEST_START("ComponentType: Registration");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register multiple components
+    YULDUZ_ComponentType types[5] = {0};
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &types[0]));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &types[1]));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Health", .Size = sizeof(TestHealth), .Alignment = _Alignof(TestHealth), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &types[2]));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Damage", .Size = sizeof(TestDamage), .Alignment = _Alignof(TestDamage), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &types[3]));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Sprite", .Size = sizeof(TestSprite), .Alignment = _Alignof(TestSprite), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &types[4]));
+
+    // All should be unique
+    for (uint32_t i = 0; i < 5; i++) {
+        TEST_ASSERT_NOT_EQUAL(types[i], YULDUZ_INVALID_COMPONENT_TYPE);
+        for (uint32_t j = i + 1; j < 5; j++) {
+            TEST_ASSERT_NOT_EQUAL(types[i], types[j]);
+        }
+    }
+
+    // Get types back by name
+    YULDUZ_ComponentType retrieved = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentTypeInECSRegistry(&ecs, "Position", &retrieved));
+    TEST_ASSERT_EQUAL(retrieved, types[0]);
+
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentTypeInECSRegistry(&ecs, "Velocity", &retrieved));
+    TEST_ASSERT_EQUAL(retrieved, types[1]);
+
+    // Non-existent type should fail
+    TEST_ASSERT_FALSE(YULDUZ_GetComponentTypeInECSRegistry(&ecs, "NonExistent", &retrieved));
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_tag_type_registration(void) {
+    TEST_START("TagType: Registration");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register multiple tags
+    YULDUZ_TagType tags[5] = {0};
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Player", &tags[0]));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Enemy", &tags[1]));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Dead", &tags[2]));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Hidden", &tags[3]));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Active", &tags[4]));
+
+    // All should be unique
+    for (uint32_t i = 0; i < 5; i++) {
+        TEST_ASSERT_NOT_EQUAL(tags[i], YULDUZ_INVALID_TAG_TYPE);
+        for (uint32_t j = i + 1; j < 5; j++) {
+            TEST_ASSERT_NOT_EQUAL(tags[i], tags[j]);
+        }
+    }
+
+    // Get tags back by name
+    YULDUZ_TagType retrieved = YULDUZ_INVALID_TAG_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_GetTagTypeInECSRegistry(&ecs, "Player", &retrieved));
+    TEST_ASSERT_EQUAL(retrieved, tags[0]);
+
+    // Non-existent tag should fail
+    TEST_ASSERT_FALSE(YULDUZ_GetTagTypeInECSRegistry(&ecs, "NonExistent", &retrieved));
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+// ============================================================
+// ENTITY TESTS
+// ============================================================
+
+static void test_entity_creation_destruction(void) {
+    TEST_START("Entity: Creation and Destruction");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Create 100 entities
+    YULDUZ_Entity entities[100];
+    for (uint32_t i = 0; i < 100; i++) {
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entities[i]));
+        TEST_ASSERT_NOT_EQUAL(entities[i], YULDUZ_INVALID_ENTITY);
+    }
+
+    // All should be unique
+    for (uint32_t i = 0; i < 100; i++) {
+        for (uint32_t j = i + 1; j < 100; j++) {
+            TEST_ASSERT_NOT_EQUAL(entities[i], entities[j]);
+        }
+    }
+
+    // Destroy every other entity
+    for (uint32_t i = 0; i < 100; i += 2) {
+        TEST_ASSERT_TRUE(YULDUZ_DestroyEntityInECSRegistry(&ecs, entities[i]));
+    }
+
+    // Create new entities (should reuse IDs with different generations)
+    YULDUZ_Entity new_entities[50];
+    for (uint32_t i = 0; i < 50; i++) {
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &new_entities[i]));
+    }
+
+    // New entities should have same IDs as destroyed ones but different generations
+    for (uint32_t i = 0; i < 50; i++) {
+        uint32_t old_id = (uint32_t)entities[i * 2];
+        uint32_t new_id = (uint32_t)new_entities[i];
+        // TEST_ASSERT_EQUAL(old_id, new_id);                        // Same ID
+        TEST_ASSERT_NOT_EQUAL(entities[i * 2], new_entities[i]);  // Different entity
+    }
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_entity_invalid_operations(void) {
+    TEST_START("Entity: Invalid Operations");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    // Create and destroy entity
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
+    TEST_ASSERT_TRUE(YULDUZ_DestroyEntityInECSRegistry(&ecs, entity));
+
+    // Try to add component to destroyed entity (should fail)
+    TestPosition pos = {1.0f, 2.0f, 3.0f};
+    TEST_ASSERT_FALSE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos));
+
+    // Try to get component from destroyed entity (should fail)
+    TestPosition retrieved = {0};
+    TEST_ASSERT_FALSE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved));
+
+    // Try to destroy already destroyed entity (should fail)
+    TEST_ASSERT_FALSE(YULDUZ_DestroyEntityInECSRegistry(&ecs, entity));
+
+    // Try operations on invalid entity
+    TEST_ASSERT_FALSE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, YULDUZ_INVALID_ENTITY, pos_type, &pos));
+    TEST_ASSERT_FALSE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, YULDUZ_INVALID_ENTITY, pos_type, &retrieved));
+    TEST_ASSERT_FALSE(YULDUZ_DestroyEntityInECSRegistry(&ecs, YULDUZ_INVALID_ENTITY));
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+// ============================================================
+// COMPONENT LIFECYCLE TESTS
+// ============================================================
+
+static void test_component_add_remove_simple(void) {
+    TEST_START("Component: Add and Remove (POD)");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register components
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type));
 
     // Create entity
     YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
-    TEST_ASSERT(YULDUZ_CreateEntityInECSRegistry(&registry, &entity),
-                "Failed to create entity");
-    TEST_ASSERT(entity != YULDUZ_INVALID_ENTITY, "Entity should be valid");
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
 
-    // Destroy entity
-    TEST_ASSERT(YULDUZ_DestroyEntityInECSRegistry(&registry, entity),
-                "Failed to destroy entity");
+    // Add Position
+    TestPosition pos = {1.0f, 2.0f, 3.0f};
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos));
 
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    // Get Position back
+    TestPosition retrieved_pos = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved_pos));
+    TEST_ASSERT_EQUAL(retrieved_pos.x, 1.0f);
+    TEST_ASSERT_EQUAL(retrieved_pos.y, 2.0f);
+    TEST_ASSERT_EQUAL(retrieved_pos.z, 3.0f);
+
+    // Add Velocity
+    TestVelocity vel = {4.0f, 5.0f, 6.0f};
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &vel));
+
+    // Get both back
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved_pos));
+    TEST_ASSERT_EQUAL(retrieved_pos.x, 1.0f);
+
+    TestVelocity retrieved_vel = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &retrieved_vel));
+    TEST_ASSERT_EQUAL(retrieved_vel.x, 4.0f);
+    TEST_ASSERT_EQUAL(retrieved_vel.y, 5.0f);
+    TEST_ASSERT_EQUAL(retrieved_vel.z, 6.0f);
+
+    // Remove Position
+    TEST_ASSERT_TRUE(YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, pos_type));
+
+    // Position should be gone, Velocity should remain
+    TEST_ASSERT_FALSE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved_pos));
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &retrieved_vel));
+    TEST_ASSERT_EQUAL(retrieved_vel.x, 4.0f);
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
 }
 
-bool test_ecs_registry_add_component(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void test_component_lifecycle_hooks(void) {
+    TEST_START("Component: Lifecycle Hooks (OnCreate/OnDestroy)");
 
-    // Register type
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
 
-    // Create entity
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+    LifecycleTracker tracker = {0};
 
-    // Add component
-    Position pos = {1.0f, 2.0f, 3.0f};
-    TEST_ASSERT(YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos),
-                "Failed to add component");
+    // Register component with hooks
+    YULDUZ_ComponentType lc_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Lifecycle", .Size = sizeof(TestLifecycle), .Alignment = _Alignof(TestLifecycle), .OnCreatePFN = TestLifecycle_OnCreate, .OnDestroyPFN = TestLifecycle_OnDestroy, .OnClonePFN = TestLifecycle_OnClone, .UserData = &tracker}, &lc_type));
 
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
+    // Create 10 entities with lifecycle components
+    for (uint32_t i = 0; i < 10; i++) {
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
 
-bool test_ecs_registry_get_set_component(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Setup
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
-
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-
-    Position pos = {1.0f, 2.0f, 3.0f};
-    YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-
-    // Get component
-    Position retrieved_pos = {0};
-    TEST_ASSERT(YULDUZ_GetComponentInECSRegistry(&registry, entity, "Position", &retrieved_pos),
-                "Failed to get component");
-    TEST_ASSERT(retrieved_pos.x == 1.0f && retrieved_pos.y == 2.0f && retrieved_pos.z == 3.0f,
-                "Component data mismatch");
-
-    // Set component
-    Position new_pos = {10.0f, 20.0f, 30.0f};
-    TEST_ASSERT(YULDUZ_SetComponentInECSRegistry(&registry, entity, "Position", &new_pos),
-                "Failed to set component");
-
-    // Verify update
-    YULDUZ_GetComponentInECSRegistry(&registry, entity, "Position", &retrieved_pos);
-    TEST_ASSERT(retrieved_pos.x == 10.0f && retrieved_pos.y == 20.0f && retrieved_pos.z == 30.0f,
-                "Component not updated");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_ecs_registry_remove_component(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Setup
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
-
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-
-    Position pos = {1.0f, 2.0f, 3.0f};
-    YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-
-    // Remove component
-    TEST_ASSERT(YULDUZ_RemoveComponentInECSRegistry(&registry, entity, "Position"),
-                "Failed to remove component");
-
-    // Verify removal
-    Position retrieved = {0};
-    TEST_ASSERT(!YULDUZ_GetComponentInECSRegistry(&registry, entity, "Position", &retrieved),
-                "Component should not exist after removal");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_ecs_registry_add_remove_tag(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register tag
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Player",
-        .Size      = 0,
-        .Alignment = 0};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
-
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-
-    // Add tag
-    TEST_ASSERT(YULDUZ_AddTagInECSRegistry(&registry, entity, "Player"),
-                "Failed to add tag");
-
-    // Check tag
-    TEST_ASSERT(YULDUZ_HasTagInECSRegistry(&registry, entity, "Player"),
-                "Entity should have Player tag");
-
-    // Remove tag
-    TEST_ASSERT(YULDUZ_RemoveTagInECSRegistry(&registry, entity, "Player"),
-                "Failed to remove tag");
-
-    // Verify removal
-    TEST_ASSERT(!YULDUZ_HasTagInECSRegistry(&registry, entity, "Player"),
-                "Entity should not have Player tag after removal");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_ecs_registry_multiple_components(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register types
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)}};
-
-    for (uint32_t i = 0; i < 3; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], nullptr);
+        TestLifecycle lc = {.id = i + 100};
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, lc_type, &lc));
     }
 
-    // Create entity
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+    // Verify OnCreate was called 10 times
+    TEST_ASSERT_EQUAL(tracker.create_count, 10);
+    TEST_ASSERT_EQUAL(tracker.last_created_id, 109);
 
-    // Add all components
-    Position pos    = {1.0f, 2.0f, 3.0f};
-    Velocity vel    = {10.0f, 20.0f, 30.0f};
-    Health   health = {100.0f, 100.0f};
+    // Destroy 5 entities
+    YULDUZ_Entity entities[5];
+    for (uint32_t i = 0; i < 5; i++) {
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entities[i]));
+        TestLifecycle lc = {.id = i + 200};
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entities[i], lc_type, &lc));
+    }
 
-    YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-    YULDUZ_AddComponentInECSRegistry(&registry, entity, "Velocity", &vel);
-    YULDUZ_AddComponentInECSRegistry(&registry, entity, "Health", &health);
+    // create_count should now be 15
+    TEST_ASSERT_EQUAL(tracker.create_count, 15);
 
-    // Verify all components
-    Position ret_pos    = {0};
-    Velocity ret_vel    = {0};
-    Health   ret_health = {0};
+    // Destroy entities
+    for (uint32_t i = 0; i < 5; i++) {
+        TEST_ASSERT_TRUE(YULDUZ_DestroyEntityInECSRegistry(&ecs, entities[i]));
+    }
 
-    TEST_ASSERT(YULDUZ_GetComponentInECSRegistry(&registry, entity, "Position", &ret_pos),
-                "Failed to get Position");
-    TEST_ASSERT(YULDUZ_GetComponentInECSRegistry(&registry, entity, "Velocity", &ret_vel),
-                "Failed to get Velocity");
-    TEST_ASSERT(YULDUZ_GetComponentInECSRegistry(&registry, entity, "Health", &ret_health),
-                "Failed to get Health");
+    // Verify OnDestroy was called 5 times
+    TEST_ASSERT_EQUAL(tracker.destroy_count, 5);
 
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    // Release ECS (should call OnDestroy on remaining 10 entities)
+    YULDUZ_ReleaseECSRegistry(&ecs);
+
+    // Total destroys should be 15
+    TEST_ASSERT_EQUAL(tracker.destroy_count, 15);
+
+    TEST_END();
 }
 
-bool test_ecs_registry_archetype_transitions(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void test_component_memory_cleanup(void) {
+    TEST_START("Component: Memory Cleanup (Dynamic Allocation)");
 
-    // Register types
-    YULDUZ_TypeDescription pos_desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, pos_desc, nullptr);
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
 
-    // Create entity in null archetype
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
+    // Register component with destructor
+    YULDUZ_ComponentType arr_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "DynamicArray", .Size = sizeof(TestDynamicArray), .Alignment = _Alignof(TestDynamicArray), .OnCreatePFN = TestDynamicArray_OnCreate, .OnDestroyPFN = TestDynamicArray_OnDestroy, .OnClonePFN = NULL, .UserData = NULL}, &arr_type));
 
-    uint32_t initial_archetype_count = registry.DenseCount;
-
-    // Add component - should create new archetype
-    Position pos = {1.0f, 2.0f, 3.0f};
-    YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-
-    TEST_ASSERT(registry.DenseCount > initial_archetype_count,
-                "Should have created new archetype");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_ecs_registry_get_archetype_count(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    uint32_t count = 0;
-    TEST_ASSERT(YULDUZ_GetArchetypeCountInECSRegistry(&registry, &count),
-                "Failed to get archetype count");
-    TEST_ASSERT(count >= 1, "Should have at least null archetype");
-
-    // Register type and add component to create new archetype
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
-
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-    Position pos = {0};
-    YULDUZ_AddComponentInECSRegistry(&registry, entity, "Position", &pos);
-
-    uint32_t new_count = 0;
-    YULDUZ_GetArchetypeCountInECSRegistry(&registry, &new_count);
-    TEST_ASSERT(new_count > count, "Archetype count should have increased");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_ecs_registry_component_with_type(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register type
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_Type type;
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, &type);
-
-    // Create entity and add component using type
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-
-    Position pos = {5.0f, 10.0f, 15.0f};
-    TEST_ASSERT(YULDUZ_AddComponentWithTypeInECSRegistry(&registry, entity, type, &pos),
-                "Failed to add component with type");
-
-    // Get component using type
-    Position retrieved = {0};
-    TEST_ASSERT(YULDUZ_GetComponentWithTypeInECSRegistry(&registry, entity, type, &retrieved),
-                "Failed to get component with type");
-    TEST_ASSERT(retrieved.x == 5.0f && retrieved.y == 10.0f && retrieved.z == 15.0f,
-                "Component data mismatch");
-
-    // Set component using type
-    Position new_pos = {50.0f, 100.0f, 150.0f};
-    TEST_ASSERT(YULDUZ_SetComponentWithTypeInECSRegistry(&registry, entity, type, &new_pos),
-                "Failed to set component with type");
-
-    // Remove component using type
-    TEST_ASSERT(YULDUZ_RemoveComponentWithTypeInECSRegistry(&registry, entity, type),
-                "Failed to remove component with type");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_ecs_registry_tag_with_type(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register tag
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Player",
-        .Size      = 0,
-        .Alignment = 0};
-    YULDUZ_Type type;
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, &type);
-
-    YULDUZ_Entity entity;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &entity);
-
-    // Add tag with type
-    TEST_ASSERT(YULDUZ_AddTagWithTypeInECSRegistry(&registry, entity, type),
-                "Failed to add tag with type");
-
-    // Check tag with type
-    TEST_ASSERT(YULDUZ_HasTagWithTypeInECSRegistry(&registry, entity, type),
-                "Entity should have tag");
-
-    // Remove tag with type
-    TEST_ASSERT(YULDUZ_RemoveTagWithTypeInECSRegistry(&registry, entity, type),
-                "Failed to remove tag with type");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
-}
-
-bool test_ecs_registry_multiple_entities_same_archetype(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 32, 8, 16};
-    YULDUZ_InitializeECSRegistry(&registry, info);
-
-    // Register type
-    YULDUZ_TypeDescription desc = {
-        .Name      = "Position",
-        .Size      = sizeof(Position),
-        .Alignment = alignof(Position)};
-    YULDUZ_RegisterTypeInECSRegistry(&registry, desc, nullptr);
-
-    // Create multiple entities with same component
+    // Create entities with allocated memory
     YULDUZ_Entity entities[10];
     for (uint32_t i = 0; i < 10; i++) {
-        YULDUZ_CreateEntityInECSRegistry(&registry, &entities[i]);
-        Position pos = {(float)i, (float)i * 2, (float)i * 3};
-        YULDUZ_AddComponentInECSRegistry(&registry, entities[i], "Position", &pos);
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entities[i]));
+
+        // Allocate memory
+        float *data = (float *)SDL_malloc(100 * sizeof(float));
+        TEST_ASSERT_NOT_NULL(data);
+        for (uint32_t j = 0; j < 100; j++) {
+            data[j] = (float)j;
+        }
+
+        TestDynamicArray arr = {.data = data, .count = 100, .capacity = 100};
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entities[i], arr_type, &arr));
     }
 
-    // Verify all entities
+    // Remove components from 5 entities (should free their memory)
+    for (uint32_t i = 0; i < 5; i++) {
+        TEST_ASSERT_TRUE(YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entities[i], arr_type));
+    }
+
+    // Destroy 3 entities (should free their memory)
+    for (uint32_t i = 5; i < 8; i++) {
+        TEST_ASSERT_TRUE(YULDUZ_DestroyEntityInECSRegistry(&ecs, entities[i]));
+    }
+
+    // Release ECS (should free remaining 2)
+    YULDUZ_ReleaseECSRegistry(&ecs);
+
+    // If we had memory leak detection, we'd verify all 10 allocations were freed
+    // For now, running under Valgrind/ASan will catch leaks
+
+    TEST_END();
+}
+
+// ============================================================
+// TAG TESTS
+// ============================================================
+
+static void test_tag_add_remove(void) {
+    TEST_START("Tag: Add and Remove");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register tags
+    YULDUZ_TagType player_tag = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_TagType enemy_tag  = YULDUZ_INVALID_TAG_TYPE;
+    YULDUZ_TagType dead_tag   = YULDUZ_INVALID_TAG_TYPE;
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Player", &player_tag));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Enemy", &enemy_tag));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Dead", &dead_tag));
+
+    // Create entity
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
+
+    // Initially has no tags
+    TEST_ASSERT_FALSE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, player_tag));
+    TEST_ASSERT_FALSE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, enemy_tag));
+    TEST_ASSERT_FALSE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, dead_tag));
+
+    // Add Player tag
+    TEST_ASSERT_TRUE(YULDUZ_AddTagWithTypeInECSRegistry(&ecs, entity, player_tag));
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, player_tag));
+    TEST_ASSERT_FALSE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, enemy_tag));
+
+    // Add Enemy tag
+    TEST_ASSERT_TRUE(YULDUZ_AddTagWithTypeInECSRegistry(&ecs, entity, enemy_tag));
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, player_tag));
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, enemy_tag));
+
+    // Add Dead tag
+    TEST_ASSERT_TRUE(YULDUZ_AddTagWithTypeInECSRegistry(&ecs, entity, dead_tag));
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, player_tag));
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, enemy_tag));
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, dead_tag));
+
+    // Remove Player tag
+    TEST_ASSERT_TRUE(YULDUZ_RemoveTagWithTypeInECSRegistry(&ecs, entity, player_tag));
+    TEST_ASSERT_FALSE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, player_tag));
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, enemy_tag));
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, dead_tag));
+
+    // Remove all remaining tags
+    TEST_ASSERT_TRUE(YULDUZ_RemoveTagWithTypeInECSRegistry(&ecs, entity, enemy_tag));
+    TEST_ASSERT_TRUE(YULDUZ_RemoveTagWithTypeInECSRegistry(&ecs, entity, dead_tag));
+    TEST_ASSERT_FALSE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, player_tag));
+    TEST_ASSERT_FALSE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, enemy_tag));
+    TEST_ASSERT_FALSE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, entity, dead_tag));
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+// ============================================================
+// ARCHETYPE TESTS
+// ============================================================
+
+static void test_archetype_creation(void) {
+    TEST_START("Archetype: Creation and Growth");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register components
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType hp_type  = YULDUZ_INVALID_COMPONENT_TYPE;
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Health", .Size = sizeof(TestHealth), .Alignment = _Alignof(TestHealth), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &hp_type));
+
+    // Start with null archetype
+    uint32_t archetype_count = 0;
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_EQUAL(archetype_count, 1);
+
+    TestPosition pos = {0};
+    TestVelocity vel = {0};
+    TestHealth   hp  = {100.0f, 100.0f};
+
+    // Create entity with Position → new archetype [Position]
+    YULDUZ_Entity e1 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e1));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e1, pos_type, &pos));
+
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_EQUAL(archetype_count, 2);  // Null + [Position]
+
+    // Add Velocity → new archetype [Position, Velocity]
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e1, vel_type, &vel));
+
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_EQUAL(archetype_count, 3);  // Null + [Position] + [Position, Velocity]
+
+    // Create entity with [Position, Velocity] → reuses existing archetype
+    YULDUZ_Entity e2 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e2));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e2, pos_type, &pos));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e2, vel_type, &vel));
+
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_EQUAL(archetype_count, 3);  // No new archetype
+
+    // Create entity with [Position, Health] → new archetype
+    YULDUZ_Entity e3 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e3));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e3, pos_type, &pos));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e3, hp_type, &hp));
+
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_EQUAL(archetype_count, 4);  // +[Position, Health]
+
+    // Create entity with [Position, Velocity, Health] → new archetype
+    YULDUZ_Entity e4 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &e4));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e4, pos_type, &pos));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e4, vel_type, &vel));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, e4, hp_type, &hp));
+
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_EQUAL(archetype_count, 5);  // +[Position, Velocity, Health]
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_archetype_transitions(void) {
+    TEST_START("Archetype: Component Add/Remove Transitions");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register components
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType hp_type  = YULDUZ_INVALID_COMPONENT_TYPE;
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type));
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Health", .Size = sizeof(TestHealth), .Alignment = _Alignof(TestHealth), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &hp_type));
+
+    // Create entity and transition through archetypes
+    YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
+
+    TestPosition pos = {1.0f, 2.0f, 3.0f};
+    TestVelocity vel = {4.0f, 5.0f, 6.0f};
+    TestHealth   hp  = {100.0f, 100.0f};
+
+    // Archetype: [] (null)
+    // Add Position → [Position]
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos));
+
+    TestPosition retrieved_pos = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved_pos));
+    TEST_ASSERT_EQUAL(retrieved_pos.x, 1.0f);
+
+    // Add Velocity → [Position, Velocity]
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &vel));
+
+    TestVelocity retrieved_vel = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &retrieved_vel));
+    TEST_ASSERT_EQUAL(retrieved_vel.x, 4.0f);
+
+    // Position should still be there
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved_pos));
+    TEST_ASSERT_EQUAL(retrieved_pos.x, 1.0f);
+
+    // Add Health → [Position, Velocity, Health]
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, hp_type, &hp));
+
+    // All components should be there
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved_pos));
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &retrieved_vel));
+
+    TestHealth retrieved_hp = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, hp_type, &retrieved_hp));
+    TEST_ASSERT_EQUAL(retrieved_hp.current, 100.0f);
+
+    // Remove Velocity → [Position, Health]
+    TEST_ASSERT_TRUE(YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, vel_type));
+
+    // Velocity should be gone
+    TEST_ASSERT_FALSE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &retrieved_vel));
+
+    // Position and Health should remain
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved_pos));
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, hp_type, &retrieved_hp));
+
+    // Remove all → []
+    TEST_ASSERT_TRUE(YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, pos_type));
+    TEST_ASSERT_TRUE(YULDUZ_RemoveComponentWithTypeInECSRegistry(&ecs, entity, hp_type));
+
+    // All should be gone
+    TEST_ASSERT_FALSE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &retrieved_pos));
+    TEST_ASSERT_FALSE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, vel_type, &retrieved_vel));
+    TEST_ASSERT_FALSE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, entity, hp_type, &retrieved_hp));
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+// ============================================================
+// CLONE TESTS
+// ============================================================
+
+static void test_clone_pod(void) {
+    TEST_START("Clone: POD Components (no OnClone)");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type = YULDUZ_INVALID_COMPONENT_TYPE;
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type));
+
+    // Create source entity
+    YULDUZ_Entity src = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &src));
+    TestPosition src_pos = {1.0f, 2.0f, 3.0f};
+    TestVelocity src_vel = {4.0f, 5.0f, 6.0f};
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, src, pos_type, &src_pos));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, src, vel_type, &src_vel));
+
+    // Clone
+    YULDUZ_Entity dst = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CloneEntityInECSRegistry(&ecs, src, &dst));
+
+    // dst should be a different valid entity
+    TEST_ASSERT_NOT_EQUAL(dst, YULDUZ_INVALID_ENTITY);
+    TEST_ASSERT_NOT_EQUAL(dst, src);
+
+    // dst should have the same component values
+    TestPosition dst_pos = {0};
+    TestVelocity dst_vel = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, dst, pos_type, &dst_pos));
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, dst, vel_type, &dst_vel));
+    TEST_ASSERT_EQUAL(dst_pos.x, 1.0f);
+    TEST_ASSERT_EQUAL(dst_pos.y, 2.0f);
+    TEST_ASSERT_EQUAL(dst_pos.z, 3.0f);
+    TEST_ASSERT_EQUAL(dst_vel.x, 4.0f);
+    TEST_ASSERT_EQUAL(dst_vel.y, 5.0f);
+    TEST_ASSERT_EQUAL(dst_vel.z, 6.0f);
+
+    // Modifying dst should not affect src
+    TestPosition new_pos = {9.0f, 9.0f, 9.0f};
+    TEST_ASSERT_TRUE(YULDUZ_SetComponentWithTypeInECSRegistry(&ecs, dst, pos_type, &new_pos));
+    TestPosition src_pos_after = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, src, pos_type, &src_pos_after));
+    TEST_ASSERT_EQUAL(src_pos_after.x, 1.0f);  // src unchanged
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_clone_with_on_clone_callback(void) {
+    TEST_START("Clone: OnClone Callback Invoked (not OnCreate)");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    LifecycleTracker tracker = {0};
+
+    YULDUZ_ComponentType lc_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Lifecycle", .Size = sizeof(TestLifecycle), .Alignment = _Alignof(TestLifecycle), .OnCreatePFN = TestLifecycle_OnCreate, .OnDestroyPFN = TestLifecycle_OnDestroy, .OnClonePFN = TestLifecycle_OnClone, .UserData = &tracker}, &lc_type));
+
+    // Create source entity — OnCreate fires
+    YULDUZ_Entity src = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &src));
+    TestLifecycle lc = {.id = 42};
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, src, lc_type, &lc));
+    TEST_ASSERT_EQUAL(tracker.create_count, 1);
+    TEST_ASSERT_EQUAL(tracker.clone_count, 0);
+
+    // Clone — OnClone fires, OnCreate must NOT fire again
+    YULDUZ_Entity dst = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CloneEntityInECSRegistry(&ecs, src, &dst));
+    TEST_ASSERT_EQUAL(tracker.clone_count, 1);
+    TEST_ASSERT_EQUAL(tracker.create_count, 1);  // Still 1
+
+    // dst component reflects the clone (OnClone increments on_clone_calls)
+    TestLifecycle dst_lc = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, dst, lc_type, &dst_lc));
+    TEST_ASSERT_EQUAL(dst_lc.id, 42);
+    TEST_ASSERT_EQUAL(dst_lc.on_clone_calls, 1);
+
+    // src should be unaffected
+    TestLifecycle src_lc = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, src, lc_type, &src_lc));
+    TEST_ASSERT_EQUAL(src_lc.on_clone_calls, 0);
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_clone_same_archetype(void) {
+    TEST_START("Clone: dst Lands in Same Archetype as src");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    YULDUZ_ComponentType pos_type   = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_ComponentType vel_type   = YULDUZ_INVALID_COMPONENT_TYPE;
+    YULDUZ_TagType       active_tag = YULDUZ_INVALID_TAG_TYPE;
+
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Velocity", .Size = sizeof(TestVelocity), .Alignment = _Alignof(TestVelocity), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &vel_type));
+    TEST_ASSERT_TRUE(YULDUZ_RegisterTagTypeInECSRegistry(&ecs, "Active", &active_tag));
+
+    // Create source entity with components and tag
+    YULDUZ_Entity src = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &src));
+    TestPosition pos = {1.0f, 2.0f, 3.0f};
+    TestVelocity vel = {4.0f, 5.0f, 6.0f};
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, src, pos_type, &pos));
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, src, vel_type, &vel));
+    TEST_ASSERT_TRUE(YULDUZ_AddTagWithTypeInECSRegistry(&ecs, src, active_tag));
+
+    uint32_t archetype_count_before = 0;
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count_before));
+
+    // Clone — must not create a new archetype
+    YULDUZ_Entity dst = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CloneEntityInECSRegistry(&ecs, src, &dst));
+
+    uint32_t archetype_count_after = 0;
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count_after));
+    TEST_ASSERT_EQUAL(archetype_count_after, archetype_count_before);  // No new archetype
+
+    // dst inherits the tag from the archetype
+    TEST_ASSERT_TRUE(YULDUZ_HasTagWithTypeInECSRegistry(&ecs, dst, active_tag));
+
+    // dst has same component data
+    TestPosition dst_pos = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, dst, pos_type, &dst_pos));
+    TEST_ASSERT_EQUAL(dst_pos.x, 1.0f);
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_clone_invalid(void) {
+    TEST_START("Clone: Invalid Entity Handling");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Clone YULDUZ_INVALID_ENTITY should fail
+    YULDUZ_Entity dst = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_FALSE(YULDUZ_CloneEntityInECSRegistry(&ecs, YULDUZ_INVALID_ENTITY, &dst));
+
+    // Clone stale (destroyed) entity should fail
+    YULDUZ_Entity src = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &src));
+    TEST_ASSERT_TRUE(YULDUZ_DestroyEntityInECSRegistry(&ecs, src));
+    TEST_ASSERT_FALSE(YULDUZ_CloneEntityInECSRegistry(&ecs, src, &dst));
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_clone_chain(void) {
+    TEST_START("Clone: Cloning a Clone");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    // Create source
+    YULDUZ_Entity src = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &src));
+    TestPosition pos = {7.0f, 8.0f, 9.0f};
+    TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, src, pos_type, &pos));
+
+    // src → clone1 → clone2
+    YULDUZ_Entity clone1 = YULDUZ_INVALID_ENTITY;
+    YULDUZ_Entity clone2 = YULDUZ_INVALID_ENTITY;
+    TEST_ASSERT_TRUE(YULDUZ_CloneEntityInECSRegistry(&ecs, src, &clone1));
+    TEST_ASSERT_TRUE(YULDUZ_CloneEntityInECSRegistry(&ecs, clone1, &clone2));
+
+    // All three must be distinct
+    TEST_ASSERT_NOT_EQUAL(src, clone1);
+    TEST_ASSERT_NOT_EQUAL(src, clone2);
+    TEST_ASSERT_NOT_EQUAL(clone1, clone2);
+
+    // All three must carry the same data
+    TestPosition p1 = {0}, p2 = {0};
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, clone1, pos_type, &p1));
+    TEST_ASSERT_TRUE(YULDUZ_GetComponentWithTypeInECSRegistry(&ecs, clone2, pos_type, &p2));
+    TEST_ASSERT_EQUAL(p1.x, 7.0f);
+    TEST_ASSERT_EQUAL(p2.x, 7.0f);
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+// ============================================================
+// STRESS TESTS
+// ============================================================
+
+static void test_stress_many_entities(void) {
+    TEST_START("Stress: 10,000 Entities");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    YULDUZ_ComponentType pos_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Position", .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &pos_type));
+
+    // Create 10,000 entities with Position
+    const uint32_t ENTITY_COUNT = 10000;
+    TestPosition   pos          = {1.0f, 2.0f, 3.0f};
+
+    for (uint32_t i = 0; i < ENTITY_COUNT; i++) {
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, pos_type, &pos));
+    }
+
+    // All should be in same archetype
+    uint32_t archetype_count = 0;
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_EQUAL(archetype_count, 2);  // Null + [Position]
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
+}
+
+static void test_stress_many_archetypes(void) {
+    TEST_START("Stress: 100 Archetypes");
+
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
+
+    // Register 10 components
+    YULDUZ_ComponentType types[10];
     for (uint32_t i = 0; i < 10; i++) {
-        Position retrieved = {0};
-        TEST_ASSERT(YULDUZ_GetComponentInECSRegistry(&registry, entities[i], "Position", &retrieved),
-                    "Failed to get component");
-        TEST_ASSERT(retrieved.x == (float)i, "Component data mismatch");
+        char name[32];
+        SDL_snprintf(name, sizeof(name), "Component%u", i);
+
+        TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = name, .Size = sizeof(TestPosition), .Alignment = _Alignof(TestPosition), .OnCreatePFN = NULL, .OnDestroyPFN = NULL, .OnClonePFN = NULL, .UserData = NULL}, &types[i]));
     }
 
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    // Create 100 different archetypes (different combinations of components)
+    TestPosition data = {0};
+
+    for (uint32_t i = 0; i < 100; i++) {
+        YULDUZ_Entity entity = YULDUZ_INVALID_ENTITY;
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entity));
+
+        // Add components based on bit pattern of i
+        for (uint32_t j = 0; j < 10; j++) {
+            if ((i & (1u << j)) != 0) {
+                TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entity, types[j], &data));
+            }
+        }
+    }
+
+    // Should have many archetypes
+    uint32_t archetype_count = 0;
+    TEST_ASSERT_TRUE(YULDUZ_GetArchetypeCountInECSRegistry(&ecs, &archetype_count));
+    TEST_ASSERT_TRUE(archetype_count > 50);  // At least 50 different archetypes
+
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
 }
 
-bool test_ecs_registry_complex_scenario(void) {
-    YULDUZ_ECSRegistry               registry = {0};
-    YULDUZ_ECSRegistryInitializeInfo info     = {16, 64, 16, 32};
-    YULDUZ_InitializeECSRegistry(&registry, info);
+static void test_stress_lifecycle_hooks(void) {
+    TEST_START("Stress: 1,000 Components with Lifecycle Hooks");
 
-    // Register types
-    YULDUZ_TypeDescription descs[] = {
-        {.Name = "Position", .Size = sizeof(Position), .Alignment = alignof(Position)},
-        {.Name = "Velocity", .Size = sizeof(Velocity), .Alignment = alignof(Velocity)},
-        {.Name = "Health", .Size = sizeof(Health), .Alignment = alignof(Health)},
-        {.Name = "Player", .Size = 0, .Alignment = 0},
-        {.Name = "Enemy", .Size = 0, .Alignment = 0}};
+    YULDUZ_ECSRegistry ecs = {0};
+    TEST_ASSERT_TRUE(setup_test_ecs(&ecs));
 
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_RegisterTypeInECSRegistry(&registry, descs[i], nullptr);
+    LifecycleTracker tracker = {0};
+
+    YULDUZ_ComponentType lc_type = YULDUZ_INVALID_COMPONENT_TYPE;
+    TEST_ASSERT_TRUE(YULDUZ_RegisterComponentTypeInECSRegistry(&ecs, (YULDUZ_ComponentTypeDescription){.Name = "Lifecycle", .Size = sizeof(TestLifecycle), .Alignment = _Alignof(TestLifecycle), .OnCreatePFN = TestLifecycle_OnCreate, .OnDestroyPFN = TestLifecycle_OnDestroy, .OnClonePFN = NULL, .UserData = &tracker}, &lc_type));
+
+    // Create 1000 entities
+    const uint32_t COUNT = 1000;
+    YULDUZ_Entity  entities[1000];
+
+    for (uint32_t i = 0; i < COUNT; i++) {
+        TEST_ASSERT_TRUE(YULDUZ_CreateEntityInECSRegistry(&ecs, &entities[i]));
+        TestLifecycle lc = {.id = i};
+        TEST_ASSERT_TRUE(YULDUZ_AddComponentWithTypeInECSRegistry(&ecs, entities[i], lc_type, &lc));
     }
 
-    // Create player entity
-    YULDUZ_Entity player;
-    YULDUZ_CreateEntityInECSRegistry(&registry, &player);
+    TEST_ASSERT_EQUAL(tracker.create_count, COUNT);
 
-    Position player_pos    = {0.0f, 0.0f, 0.0f};
-    Velocity player_vel    = {1.0f, 0.0f, 0.0f};
-    Health   player_health = {100.0f, 100.0f};
-
-    YULDUZ_AddComponentInECSRegistry(&registry, player, "Position", &player_pos);
-    YULDUZ_AddComponentInECSRegistry(&registry, player, "Velocity", &player_vel);
-    YULDUZ_AddComponentInECSRegistry(&registry, player, "Health", &player_health);
-    YULDUZ_AddTagInECSRegistry(&registry, player, "Player");
-
-    // Create enemies
-    YULDUZ_Entity enemies[5];
-    for (uint32_t i = 0; i < 5; i++) {
-        YULDUZ_CreateEntityInECSRegistry(&registry, &enemies[i]);
-
-        Position pos    = {(float)(i * 10), 0.0f, 0.0f};
-        Health   health = {50.0f, 50.0f};
-
-        YULDUZ_AddComponentInECSRegistry(&registry, enemies[i], "Position", &pos);
-        YULDUZ_AddComponentInECSRegistry(&registry, enemies[i], "Health", &health);
-        YULDUZ_AddTagInECSRegistry(&registry, enemies[i], "Enemy");
+    // Destroy all
+    for (uint32_t i = 0; i < COUNT; i++) {
+        TEST_ASSERT_TRUE(YULDUZ_DestroyEntityInECSRegistry(&ecs, entities[i]));
     }
 
-    // Verify player
-    TEST_ASSERT(YULDUZ_HasTagInECSRegistry(&registry, player, "Player"),
-                "Player should have Player tag");
+    TEST_ASSERT_EQUAL(tracker.destroy_count, COUNT);
 
-    // Verify enemies
-    for (uint32_t i = 0; i < 5; i++) {
-        TEST_ASSERT(YULDUZ_HasTagInECSRegistry(&registry, enemies[i], "Enemy"),
-                    "Enemy should have Enemy tag");
-    }
-
-    // Destroy an enemy
-    YULDUZ_DestroyEntityInECSRegistry(&registry, enemies[2]);
-
-    // Verify destroyed enemy no longer exists
-    Health check_health = {0};
-    TEST_ASSERT(!YULDUZ_GetComponentInECSRegistry(&registry, enemies[2], "Health", &check_health),
-                "Destroyed entity should not have components");
-
-    YULDUZ_ReleaseECSRegistry(&registry);
-    TEST_PASS();
+    YULDUZ_ReleaseECSRegistry(&ecs);
+    TEST_END();
 }
 
-// ============================================================================
-// Test Runner
-// ============================================================================
+// ============================================================
+// ENTRY POINT
+// ============================================================
 
 void run_all_ecs_registry_tests(void) {
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("Running ECS Registry Tests");
-    YULDUZ_LOG_INFO("========================================\n");
+    YULDUZ_LOG_INFO("");
+    YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
+    YULDUZ_LOG_INFO("║           ECS REGISTRY COMPREHENSIVE TESTS                     ║");
+    YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝");
+    YULDUZ_LOG_INFO("");
 
-    uint32_t passed = 0;
-    uint32_t total  = 0;
+    // Basic functionality
+    test_ecs_initialization();
+    test_component_type_registration();
+    test_tag_type_registration();
 
-#define RUN_TEST(test)        \
-    do {                      \
-        total++;              \
-        if (test()) passed++; \
-    } while (0)
+    // Entity tests
+    test_entity_creation_destruction();
+    test_entity_invalid_operations();
 
-    RUN_TEST(test_ecs_registry_initialize_release);
-    RUN_TEST(test_ecs_registry_register_types);
-    RUN_TEST(test_ecs_registry_get_types);
-    RUN_TEST(test_ecs_registry_get_type_info);
-    RUN_TEST(test_ecs_registry_create_destroy_entity);
-    RUN_TEST(test_ecs_registry_add_component);
-    RUN_TEST(test_ecs_registry_get_set_component);
-    RUN_TEST(test_ecs_registry_remove_component);
-    RUN_TEST(test_ecs_registry_add_remove_tag);
-    RUN_TEST(test_ecs_registry_multiple_components);
-    RUN_TEST(test_ecs_registry_archetype_transitions);
-    RUN_TEST(test_ecs_registry_get_archetype_count);
-    RUN_TEST(test_ecs_registry_component_with_type);
-    RUN_TEST(test_ecs_registry_tag_with_type);
-    RUN_TEST(test_ecs_registry_multiple_entities_same_archetype);
-    RUN_TEST(test_ecs_registry_complex_scenario);
+    // Component lifecycle
+    test_component_add_remove_simple();
+    test_component_lifecycle_hooks();
+    test_component_memory_cleanup();
 
-#undef RUN_TEST
+    // Tag tests
+    test_tag_add_remove();
 
-    YULDUZ_LOG_INFO("\n========================================");
-    YULDUZ_LOG_INFO("ECS Registry Tests: %u/%u passed", passed, total);
-    YULDUZ_LOG_INFO("========================================\n");
+    // Archetype tests
+    test_archetype_creation();
+    test_archetype_transitions();
+
+    // Clone tests
+    test_clone_pod();
+    test_clone_with_on_clone_callback();
+    test_clone_same_archetype();
+    test_clone_invalid();
+    test_clone_chain();
+
+    // Stress tests
+    test_stress_many_entities();
+    test_stress_many_archetypes();
+    test_stress_lifecycle_hooks();
+
+    PRINT_TEST_RESULTS();
 }

@@ -23,6 +23,10 @@ struct YULDUZ_EntityRegistry {
 
     uint32_t FreeListCapacity;
     uint32_t FreeListCount;
+
+    uint32_t EntityCount;
+
+    uint32_t _yulduz_padding;
 };
 
 #define YULDUZ_INVALID_ENTITY_RECORD                      \
@@ -47,3 +51,5 @@ YULDUZ_API bool YULDUZ_GetEntityRecordsInEntityRegistry(
 YULDUZ_API bool YULDUZ_SetEntityRecordsInEntityRegistry(
     const YULDUZ_EntityRegistry *registry, const YULDUZ_Entity *entities,
     const YULDUZ_EntityRecord *records, uint32_t count);
+
+YULDUZ_API uint32_t YULDUZ_GetEntityCountInEntityRegistry(const YULDUZ_EntityRegistry *registry);

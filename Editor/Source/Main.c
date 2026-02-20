@@ -1,22 +1,11 @@
 #include <Yulduz/Engine.h>
-#include <SDL3/SDL.h>
 
 // Forward declarations for test runners
-void run_all_type_registry_tests(void);
-void run_all_entity_registry_tests(void);
-void run_all_archetype_tests(void);
-void run_all_ecs_registry_tests(void);
-void run_all_query_tests(void);
+void run_all_ecs_registry_tests(void);  // Comprehensive tests
 void run_all_system_tests(void);
 
 // Forward declarations for benchmark runners
-void run_all_type_registry_benchmarks(void);
-void run_all_entity_registry_benchmarks(void);
-void run_all_archetype_benchmarks(void);
-void run_all_ecs_registry_benchmarks(void);
-void run_all_query_benchmarks(void);
-void run_all_system_benchmarks(void);
-void run_all_benchmarks(void);
+void run_all_ecs_benchmarks(void);  // Comprehensive benchmarks
 
 void AssertFN(void *user_data, YULDUZ_AssertEntry *entry);
 void LogFN(YULDUZ_Logger *logger, YULDUZ_LogEntry *entry);
@@ -65,21 +54,17 @@ int32_t main(int32_t argc, char **argv) {
     // ========================================
     if (run_tests) {
         YULDUZ_LOG_INFO("\n");
-        YULDUZ_LOG_INFO("╔══════════════════════════════════════════════════════════════════════════════╗");
-        YULDUZ_LOG_INFO("║                              RUNNING TESTS                                   ║");
-        YULDUZ_LOG_INFO("╚══════════════════════════════════════════════════════════════════════════════╝");
+        YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
+        YULDUZ_LOG_INFO("║                              RUNNING TESTS                     ║");
+        YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝");
 
-        run_all_type_registry_tests();
-        run_all_entity_registry_tests();
-        run_all_archetype_tests();
         run_all_ecs_registry_tests();
-        run_all_query_tests();
         run_all_system_tests();
 
         YULDUZ_LOG_INFO("\n");
-        YULDUZ_LOG_INFO("╔══════════════════════════════════════════════════════════════════════════════╗");
-        YULDUZ_LOG_INFO("║                           TESTS COMPLETED                                    ║");
-        YULDUZ_LOG_INFO("╚══════════════════════════════════════════════════════════════════════════════╝\n");
+        YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
+        YULDUZ_LOG_INFO("║                           TESTS COMPLETED                      ║");
+        YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝\n");
     }
 
     // ========================================
@@ -87,16 +72,16 @@ int32_t main(int32_t argc, char **argv) {
     // ========================================
     if (run_benchmarks) {
         YULDUZ_LOG_INFO("\n");
-        YULDUZ_LOG_INFO("╔══════════════════════════════════════════════════════════════════════════════╗");
-        YULDUZ_LOG_INFO("║                           RUNNING BENCHMARKS                                 ║");
-        YULDUZ_LOG_INFO("╚══════════════════════════════════════════════════════════════════════════════╝");
+        YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
+        YULDUZ_LOG_INFO("║                           RUNNING BENCHMARKS                   ║");
+        YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝");
 
-        run_all_benchmarks();
+        run_all_ecs_benchmarks();
 
         YULDUZ_LOG_INFO("\n");
-        YULDUZ_LOG_INFO("╔══════════════════════════════════════════════════════════════════════════════╗");
-        YULDUZ_LOG_INFO("║                        BENCHMARKS COMPLETED                                  ║");
-        YULDUZ_LOG_INFO("╚══════════════════════════════════════════════════════════════════════════════╝\n");
+        YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
+        YULDUZ_LOG_INFO("║                        BENCHMARKS COMPLETED                    ║");
+        YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝\n");
     }
 
     YULDUZ_LOG_INFO("\n");
@@ -109,6 +94,7 @@ int32_t main(int32_t argc, char **argv) {
 }
 
 void AssertFN(void *user_data, YULDUZ_AssertEntry *entry) {
+    (void)user_data;
     char message[2048];
     SDL_vsnprintf(message, sizeof(message), entry->Format, entry->FormatArguments);
     SDL_Log("[%s:%zu][ASSERT][%s]: %s -> %s\n",

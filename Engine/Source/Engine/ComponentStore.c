@@ -1,6 +1,7 @@
 #include <Yulduz/Engine/ComponentStore.h>
 
-bool YULDUZ_InitializeComponentStore(YULDUZ_ComponentStore *store, YULDUZ_TypeInfo type_info, uint32_t initial_capacity) {
+bool YULDUZ_InitializeComponentStore(
+    YULDUZ_ComponentStore *store, YULDUZ_ComponentTypeInfo type_info, uint32_t initial_capacity) {
     SDL_zerop(store);
 
     store->TypeAlignment = type_info.Alignment;

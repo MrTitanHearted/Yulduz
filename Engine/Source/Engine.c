@@ -17,12 +17,6 @@ void YULDUZ_ReleaseEngine(YULDUZ_Engine *engine) {
     SDL_zerop(engine);
 }
 
-bool YULDUZ_RunEngine(YULDUZ_Engine *engine) {
-    SDL_SetAtomicU32(&engine->IsRunning, true);
-
-    return true;
-}
-
 YULDUZ_Engine *YULDUZ_GetEngine() {
     return g_pEngine;
 }

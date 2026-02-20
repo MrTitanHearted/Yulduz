@@ -16,7 +16,8 @@ bool YULDUZ_InitializeEntityRegistry(YULDUZ_EntityRegistry *registry, uint32_t i
     registry->FreeListCount    = 0;
     registry->FreeList         = SDL_malloc(sizeof(YULDUZ_Entity) * initial_capacity);
 
-    registry->NextEntity = 0;
+    registry->NextEntity  = 0;
+    registry->EntityCount = 0;
 
     return true;
 }
@@ -34,22 +35,24 @@ bool YULDUZ_CreateEntityInEntityRegistry(
     YULDUZ_Entity *entity) {
     YULDUZ_EnsureSparseCapacityInEntityRegistry(registry, registry->NextEntity);
 
-    uint32_t new_entity;
+    uint32_t entity_index;
     if (registry->FreeListCount > 0) {
-        new_entity = registry->FreeList[registry->FreeListCount - 1];
+        entity_index = registry->FreeList[registry->FreeListCount - 1];
         registry->FreeListCount--;
     } else {
-        new_entity = registry->NextEntity;
+        entity_index = registry->NextEntity;
         registry->NextEntity++;
-        registry->SparseGenerations[new_entity] = 0;
+        registry->SparseGenerations[entity_index] = 0;
     }
 
-    registry->Sparse[new_entity] = (YULDUZ_EntityRecord){
+    registry->Sparse[entity_index] = (YULDUZ_EntityRecord){
         .ArchetypeType  = archetype_type,
         .ArchetypeIndex = archetype_index,
     };
 
-    *entity = ((uint64_t)registry->SparseGenerations[new_entity] << 32) | new_entity;
+    *entity = ((uint64_t)registry->SparseGenerations[entity_index] << 32) | entity_index;
+
+    registry->EntityCount++;
 
     return true;
 }
@@ -73,11 +76,12 @@ bool YULDUZ_DestroyEntityInEntityRegistry(YULDUZ_EntityRegistry *registry, YULDU
     registry->FreeList[free_list_index] = entity_index;
 
     registry->Sparse[entity_index] = YULDUZ_INVALID_ENTITY_RECORD;
-    registry->SparseGenerations[entity_index]++;
     if (0xFFFFFFFF == registry->SparseGenerations[entity_index]) {
-        // Claude is saying to wrap it to 1 instead of 0. I don't quite get it, but I keep it this way for now
-        registry->SparseGenerations[entity_index] = 1;
+        registry->SparseGenerations[entity_index] = 0;
     }
+    registry->SparseGenerations[entity_index]++;
+
+    registry->EntityCount--;
 
     return true;
 }
@@ -125,6 +129,10 @@ bool YULDUZ_SetEntityRecordsInEntityRegistry(
     }
 
     return found_all;
+}
+
+uint32_t YULDUZ_GetEntityCountInEntityRegistry(const YULDUZ_EntityRegistry *registry) {
+    return registry->EntityCount;
 }
 
 void YULDUZ_EnsureSparseCapacityInEntityRegistry(YULDUZ_EntityRegistry *registry, uint32_t next_entity) {

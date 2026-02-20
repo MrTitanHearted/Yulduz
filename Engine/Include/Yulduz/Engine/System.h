@@ -9,6 +9,7 @@ typedef struct YULDUZ_System YULDUZ_System;
 
 struct YULDUZ_System {
     char *Name;
+    void *UserData;
 
     YULDUZ_QueryInfo Query;
 
@@ -23,7 +24,7 @@ struct YULDUZ_System {
 };
 
 YULDUZ_API bool YULDUZ_InitializeSystem(
-    YULDUZ_System *system, const char *name, const YULDUZ_Query *query, YULDUZ_SystemPFN system_pfn);
+    YULDUZ_System *system, const char *name, void *user_data, const YULDUZ_Query *query, YULDUZ_SystemPFN system_pfn);
 YULDUZ_API void YULDUZ_ReleaseSystem(YULDUZ_System *system);
 
-YULDUZ_API void YULDUZ_RunSystem(YULDUZ_System *system, const YULDUZ_ECSRegistry *registry, void *user_data);
+YULDUZ_API void YULDUZ_RunSystem(YULDUZ_System *system, const YULDUZ_ECSRegistry *registry);
