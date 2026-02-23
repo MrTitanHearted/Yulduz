@@ -1,8 +1,8 @@
 #include <Yulduz/Common/Assert.h>
 
-YULDUZ_AssertPFN g_pfnAssert = nullptr;
+static YULDUZ_AssertPFN g_pfnAssert = nullptr;
 
-void *g_UserData = nullptr;
+static void *g_UserData = nullptr;
 
 bool YULDUZ_InitializeAsserts(
     YULDUZ_AssertPFN assert_pfn,

@@ -1,6 +1,6 @@
 #include <Yulduz/Engine/TagType.h>
 
-void YULDUZ_EnsureDenseCapacityInTagTypeRegistry(YULDUZ_TagTypeRegistry *registry, uint32_t count);
+static void YULDUZ_EnsureDenseCapacityInTagTypeRegistry(YULDUZ_TagTypeRegistry *registry, uint32_t count);
 
 bool YULDUZ_InitializeTagTypeRegistry(YULDUZ_TagTypeRegistry *registry, uint32_t initial_capacity) {
     SDL_zerop(registry);

@@ -1,6 +1,6 @@
 #include <Yulduz/Engine/ComponentType.h>
 
-void YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry, uint32_t count);
+static void YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry, uint32_t count);
 
 bool YULDUZ_InitializeComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry, uint32_t initial_capacity) {
     SDL_zerop(registry);
@@ -126,6 +126,12 @@ bool YULDUZ_GetComponentTypeDescriptionsInComponentTypeRegistry(
     }
 
     return found_all;
+}
+
+void YULDUZ_GetComponentTypeDescriptionUnsafeInComponentTypeRegistry(
+    const YULDUZ_ComponentTypeRegistry *registry, YULDUZ_ComponentType type,
+    YULDUZ_ComponentTypeDescription *type_description) {
+    *type_description = registry->Dense[type];
 }
 
 int32_t YULDUZ_SDL_CompareComponentTypes(const void *a, const void *b) {

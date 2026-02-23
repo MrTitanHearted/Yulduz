@@ -398,8 +398,7 @@ static void bench_archetype_edge_caching(void) {
 
 static uint64_t g_system_entity_count = 0;
 
-static void bench_system_callback(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data) {
-    (void)query;
+static void bench_system_callback(const YULDUZ_Archetype *archetype, void *user_data) {
     (void)user_data;
     g_system_entity_count += archetype->DenseCount;
 }

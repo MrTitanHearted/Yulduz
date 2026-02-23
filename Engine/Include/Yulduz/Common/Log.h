@@ -58,8 +58,8 @@ YULDUZ_API void YULDUZ_Log(
 
 YULDUZ_API const char *YULDUZ_GetLogLevelName(YULDUZ_LogLevel log_level);
 
-YULDUZ_API extern YULDUZ_Logger *g_pApplicationLogger;
-YULDUZ_API extern YULDUZ_Logger *g_pEngineLogger;
+YULDUZ_API extern YULDUZ_Logger *YULDUZ_g_pApplicationLogger;
+YULDUZ_API extern YULDUZ_Logger *YULDUZ_g_pEngineLogger;
 
 #ifndef YULDUZ_LOGGER_CALL
     #define YULDUZ_LOGGER_CALL(logger, log_level, fmt, ...) YULDUZ_Log(logger, log_level, __LINE__, __FILE__, __FILE_NAME__, __FUNCTION__, fmt, ##__VA_ARGS__)
@@ -84,7 +84,7 @@ YULDUZ_API extern YULDUZ_Logger *g_pEngineLogger;
 #endif
 
 #ifndef YULDUZ_LOG_CALL
-    #define YULDUZ_LOG_CALL(log_level, fmt, ...) YULDUZ_LOGGER_CALL(g_pApplicationLogger, log_level, fmt, ##__VA_ARGS__)
+    #define YULDUZ_LOG_CALL(log_level, fmt, ...) YULDUZ_LOGGER_CALL(YULDUZ_g_pApplicationLogger, log_level, fmt, ##__VA_ARGS__)
 #endif
 #ifndef YULDUZ_LOG_FATAL
     #define YULDUZ_LOG_FATAL(fmt, ...) YULDUZ_LOG_CALL(YULDUZ_LogLevel_Fatal, fmt, ##__VA_ARGS__)
@@ -149,7 +149,7 @@ YULDUZ_API extern YULDUZ_Logger *g_pEngineLogger;
 #endif
 
 #ifndef YULDUZ_LOG_ENGINE_CALL
-    #define YULDUZ_LOG_ENGINE_CALL(log_level, fmt, ...) YULDUZ_LOGGER_CALL(g_pEngineLogger, log_level, fmt, ##__VA_ARGS__)
+    #define YULDUZ_LOG_ENGINE_CALL(log_level, fmt, ...) YULDUZ_LOGGER_CALL(YULDUZ_g_pEngineLogger, log_level, fmt, ##__VA_ARGS__)
 #endif
 #ifndef YULDUZ_LOG_ENGINE_FATAL
     #define YULDUZ_LOG_ENGINE_FATAL(fmt, ...) YULDUZ_LOG_ENGINE_CALL(YULDUZ_LogLevel_Fatal, fmt, ##__VA_ARGS__)

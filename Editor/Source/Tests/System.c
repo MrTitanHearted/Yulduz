@@ -21,6 +21,8 @@ typedef struct TestHealth {
 // ============================================================
 
 typedef struct SystemTestData {
+    const YULDUZ_System *system;
+
     uint32_t archetype_call_count;
     uint32_t total_entity_count;
     uint32_t custom_value;
@@ -32,21 +34,17 @@ typedef struct SystemTestData {
 // TEST SYSTEM CALLBACKS
 // ============================================================
 
-static void empty_system(
-    const YULDUZ_Archetype *archetype,
-    const YULDUZ_QueryInfo *query,
-    void                   *user_data) {
+static void empty_system(const YULDUZ_Archetype *archetype, void *user_data) {
     SystemTestData *data = (SystemTestData *)user_data;
     data->archetype_call_count++;
     data->total_entity_count += archetype->DenseCount;
     data->was_called = true;
 }
 
-static void position_update_system(
-    const YULDUZ_Archetype *archetype,
-    const YULDUZ_QueryInfo *query,
-    void                   *user_data) {
+static void position_update_system(const YULDUZ_Archetype *archetype, void *user_data) {
     SystemTestData *data = (SystemTestData *)user_data;
+
+    const YULDUZ_QueryInfo *query = &data->system->Query;
 
     // Find Position store
     YULDUZ_ComponentStore *pos_store = NULL;
@@ -196,8 +194,8 @@ static void test_system_user_data(void) {
     TEST_ASSERT_TRUE(YULDUZ_InitializeQuery(&query, 4));
     TEST_ASSERT_TRUE(YULDUZ_SetQueryWithComponentType(&query, pos_type, YULDUZ_QueryAccessType_Write));
 
-    SystemTestData data   = {.delta_time = 0.016f, .custom_value = 999};
     YULDUZ_System  system = {0};
+    SystemTestData data   = {.system = &system, .delta_time = 0.016f, .custom_value = 999};
     TEST_ASSERT_TRUE(YULDUZ_InitializeSystem(&system, "UpdateSystem", &data, &query, position_update_system));
 
     // Run system

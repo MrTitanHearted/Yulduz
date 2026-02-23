@@ -1,9 +1,9 @@
 #include <Yulduz/Engine/Query.h>
 
-void YULDUZ_EnsureWithComponentCapacityInQuery(YULDUZ_Query *query);
-void YULDUZ_EnsureWithTagCapacityInQuery(YULDUZ_Query *query);
-void YULDUZ_EnsureWithoutComponentCapacityInQuery(YULDUZ_Query *query);
-void YULDUZ_EnsureWithoutTagCapacityInQuery(YULDUZ_Query *query);
+static void YULDUZ_EnsureWithComponentCapacityInQuery(YULDUZ_Query *query);
+static void YULDUZ_EnsureWithTagCapacityInQuery(YULDUZ_Query *query);
+static void YULDUZ_EnsureWithoutComponentCapacityInQuery(YULDUZ_Query *query);
+static void YULDUZ_EnsureWithoutTagCapacityInQuery(YULDUZ_Query *query);
 
 bool YULDUZ_InitializeQuery(YULDUZ_Query *query, uint32_t initial_capacity) {
     SDL_zerop(query);

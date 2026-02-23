@@ -1,6 +1,6 @@
 #include <Yulduz/Engine/Archetype.h>
 
-void YULDUZ_EnsureDenseCapacityInArchetype(YULDUZ_Archetype *archetype);
+static void YULDUZ_EnsureDenseCapacityInArchetype(YULDUZ_Archetype *archetype);
 
 bool YULDUZ_InitializeArchetype(
     YULDUZ_Archetype *archetype, const YULDUZ_ComponentTypeInfo *component_types, uint32_t component_count,
@@ -172,6 +172,10 @@ YULDUZ_ComponentStore *YULDUZ_QueryStoreInArchetype(
 
 YULDUZ_Entity YULDUZ_GetEntityInArchetype(const YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index) {
     return archetype->Dense[index];
+}
+
+uint32_t YULDUZ_GetEntityCountInArchetype(const YULDUZ_Archetype *archetype) {
+    return archetype->DenseCount;
 }
 
 void YULDUZ_EnsureDenseCapacityInArchetype(YULDUZ_Archetype *archetype) {

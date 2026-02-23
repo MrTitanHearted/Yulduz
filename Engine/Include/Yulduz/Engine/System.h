@@ -3,19 +3,20 @@
 #include <Yulduz/Engine/ECS.h>
 #include <Yulduz/Engine/Query.h>
 
-typedef void (*YULDUZ_SystemPFN)(const YULDUZ_Archetype *archetype, const YULDUZ_QueryInfo *query, void *user_data);
+typedef void (*YULDUZ_SystemPFN)(const YULDUZ_Archetype *archetype, void *user_data);
 
-typedef struct YULDUZ_System YULDUZ_System;
+typedef struct YULDUZ_System     YULDUZ_System;
+typedef struct YULDUZ_NodeSystem YULDUZ_NodeSystem;
 
 struct YULDUZ_System {
     char *Name;
     void *UserData;
 
-    YULDUZ_QueryInfo Query;
+    YULDUZ_ArchetypeType *Dense;
 
     YULDUZ_SystemPFN SystemPFN;
 
-    YULDUZ_ArchetypeType *Dense;
+    YULDUZ_QueryInfo Query;
 
     uint32_t DenseCapacity;
     uint32_t DenseCount;

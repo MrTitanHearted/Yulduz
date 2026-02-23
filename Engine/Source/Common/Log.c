@@ -1,7 +1,7 @@
 #include <Yulduz/Common/Log.h>
 
-YULDUZ_Logger *g_pApplicationLogger = nullptr;
-YULDUZ_Logger *g_pEngineLogger      = nullptr;
+YULDUZ_Logger *YULDUZ_g_pApplicationLogger = nullptr;
+YULDUZ_Logger *YULDUZ_g_pEngineLogger      = nullptr;
 
 const char *g_LogLevelNames[] = {
     "FATAL",
@@ -13,14 +13,14 @@ const char *g_LogLevelNames[] = {
 };
 
 bool YULDUZ_InitializeLogs(YULDUZ_Logger *engine_logger, YULDUZ_Logger *application_logger) {
-    g_pEngineLogger      = engine_logger;
-    g_pApplicationLogger = application_logger;
+    YULDUZ_g_pEngineLogger      = engine_logger;
+    YULDUZ_g_pApplicationLogger = application_logger;
     return true;
 }
 
 void YULDUZ_ReleaseLogs() {
-    g_pEngineLogger      = nullptr;
-    g_pApplicationLogger = nullptr;
+    YULDUZ_g_pEngineLogger      = nullptr;
+    YULDUZ_g_pApplicationLogger = nullptr;
 }
 
 void YULDUZ_Log(

@@ -28,4 +28,4 @@ YULDUZ_API bool YULDUZ_InitializeEngine(
     YULDUZ_Engine *engine, YULDUZ_NULLABLE const YULDUZ_EngineInitializeInfo *initialize_info);
 YULDUZ_API void YULDUZ_ReleaseEngine(YULDUZ_Engine *engine);
 
-YULDUZ_API YULDUZ_Engine *YULDUZ_GetEngine();
+YULDUZ_API extern YULDUZ_Engine *YULDUZ_g_pEngine;

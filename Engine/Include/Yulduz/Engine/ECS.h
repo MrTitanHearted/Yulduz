@@ -110,12 +110,17 @@ YULDUZ_API uint32_t YULDUZ_GetEntityCountInECSRegistry(const YULDUZ_ECSRegistry 
 YULDUZ_API bool YULDUZ_HasTagWithTypeInECSRegistry(
     const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_TagType tag_type);
 
+// UNSAFE! USE WITH CAUTION! returns a mapping unstable pointer to the component type. It assumes, component type exists
+// It will cause segmentation faults if it doesn't
+YULDUZ_API void *YULDUZ_GetComponentWithTypeUnsafeInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_ComponentType component_type);
+
 YULDUZ_API bool YULDUZ_GetComponentWithTypeInECSRegistry(
     const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
-    YULDUZ_ComponentType component_type, void *component_data);
+    YULDUZ_ComponentType component_type, YULDUZ_NULLABLE void *component_data);
 YULDUZ_API bool YULDUZ_SetComponentWithTypeInECSRegistry(
     const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity,
-    YULDUZ_ComponentType component_type, YULDUZ_NULLABLE const void *component_data);
+    YULDUZ_ComponentType component_type, const void *component_data);
 
 YULDUZ_API bool YULDUZ_AddTagWithTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_TagType tag_type);
@@ -127,6 +132,13 @@ YULDUZ_API bool YULDUZ_AddComponentWithTypeInECSRegistry(
     YULDUZ_ComponentType component_type, YULDUZ_NULLABLE const void *component_data);
 YULDUZ_API bool YULDUZ_RemoveComponentWithTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_TagType component_type);
+
+YULDUZ_API bool YULDUZ_GetEntityRecordInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_EntityRecord *record);
+
+// UNSAFE! Use with precautions! (entity must exist!, may cause segmentation faults if not)
+YULDUZ_API void YULDUZ_GetEntityRecordUnsafeInECSRegistry(
+    const YULDUZ_ECSRegistry *registry, YULDUZ_Entity entity, YULDUZ_EntityRecord *record);
 
 YULDUZ_API bool YULDUZ_GetArchetypeCountInECSRegistry(
     const YULDUZ_ECSRegistry *registry, uint32_t *archetype_count);

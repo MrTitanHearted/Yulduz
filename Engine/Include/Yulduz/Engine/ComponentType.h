@@ -94,6 +94,10 @@ YULDUZ_API bool YULDUZ_GetComponentTypeDescriptionsInComponentTypeRegistry(
     const YULDUZ_ComponentTypeRegistry *registry, const YULDUZ_ComponentType *types,
     YULDUZ_ComponentTypeDescription *type_descriptions, uint32_t type_count);
 
+YULDUZ_API void YULDUZ_GetComponentTypeDescriptionUnsafeInComponentTypeRegistry(
+    const YULDUZ_ComponentTypeRegistry *registry, YULDUZ_ComponentType type,
+    YULDUZ_ComponentTypeDescription *type_description);
+
 YULDUZ_API int32_t YULDUZ_SDL_CompareComponentTypes(const void *a, const void *b);
 
 YULDUZ_API void YULDUZ_SDL_SortComponentTypes(YULDUZ_ComponentType *types, uint32_t count);

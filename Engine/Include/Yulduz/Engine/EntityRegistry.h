@@ -45,6 +45,9 @@ YULDUZ_API bool YULDUZ_CreateEntityInEntityRegistry(
 YULDUZ_API bool YULDUZ_DestroyEntityInEntityRegistry(
     YULDUZ_EntityRegistry *registry, YULDUZ_Entity entity);
 
+YULDUZ_API bool YULDUZ_HasEntityInEntityRegistry(
+    YULDUZ_EntityRegistry *registry, YULDUZ_Entity entity);
+
 YULDUZ_API bool YULDUZ_GetEntityRecordsInEntityRegistry(
     const YULDUZ_EntityRegistry *registry, const YULDUZ_Entity *entities,
     YULDUZ_EntityRecord *records, uint32_t count);
@@ -53,3 +56,8 @@ YULDUZ_API bool YULDUZ_SetEntityRecordsInEntityRegistry(
     const YULDUZ_EntityRecord *records, uint32_t count);
 
 YULDUZ_API uint32_t YULDUZ_GetEntityCountInEntityRegistry(const YULDUZ_EntityRegistry *registry);
+
+YULDUZ_API bool YULDUZ_GetEntityRecordInEntityRegistry(
+    const YULDUZ_EntityRegistry *registry, YULDUZ_Entity entity, YULDUZ_EntityRecord *record);
+YULDUZ_API void YULDUZ_GetEntityRecordUnsafeInEntityRegistry(
+    const YULDUZ_EntityRegistry *registry, YULDUZ_Entity entity, YULDUZ_EntityRecord *record);

@@ -1,6 +1,6 @@
 #include <Yulduz/Engine/System.h>
 
-void YULDUZ_EnsureDenseCapacityInSystem(YULDUZ_System *system);
+static void YULDUZ_EnsureDenseCapacityInSystem(YULDUZ_System *system);
 
 bool YULDUZ_InitializeSystem(
     YULDUZ_System *system, const char *name, void *user_data, const YULDUZ_Query *query, YULDUZ_SystemPFN system_pfn) {
@@ -56,7 +56,7 @@ void YULDUZ_RunSystem(YULDUZ_System *system, const YULDUZ_ECSRegistry *registry)
 
     for (uint32_t i = 0; i < system->DenseCount; i++) {
         (system->SystemPFN)(
-            YULDUZ_GetArchetypeInECSRegistry(registry, system->Dense[i]), &system->Query, system->UserData);
+            YULDUZ_GetArchetypeInECSRegistry(registry, system->Dense[i]), system->UserData);
     }
 }
 
