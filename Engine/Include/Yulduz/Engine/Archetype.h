@@ -37,6 +37,8 @@ YULDUZ_API bool YULDUZ_RemoveInArchetype(
 
 YULDUZ_API bool YULDUZ_SetEntityInArchetype(
     const YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index, YULDUZ_Entity entity);
+YULDUZ_API void YULDUZ_SetEntityUnsafeInArchetype(
+    const YULDUZ_Archetype *archetype, YULDUZ_ArchetypeIndex index, YULDUZ_Entity entity);
 
 // type datas must be sorted according to their type ids
 YULDUZ_API bool YULDUZ_MoveEntityInArchetype(

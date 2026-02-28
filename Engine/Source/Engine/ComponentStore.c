@@ -26,11 +26,11 @@ void YULDUZ_ReallocateComponentStore(YULDUZ_ComponentStore *store, uint32_t old_
     store->Dense = new_dense;
 }
 
-void YULDUZ_CopyBackComponentInComponentStore(
-    const YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex index, YULDUZ_ComponentIndex back_index) {
-    uint32_t byte_index      = store->TypeSize * index;
-    uint32_t byte_back_index = store->TypeSize * back_index;
-    SDL_memcpy(&store->Dense[byte_index], &store->Dense[byte_back_index], store->TypeSize);
+void YULDUZ_CopyComponentInComponentStore(
+    const YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex src_index, YULDUZ_ComponentIndex dst_index) {
+    uint32_t src_byte_index = store->TypeSize * src_index;
+    uint32_t dst_byte_index = store->TypeSize * dst_index;
+    SDL_memcpy(&store->Dense[src_byte_index], &store->Dense[dst_byte_index], store->TypeSize);
 }
 
 void *YULDUZ_GetComponentInComponentStore(const YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex index) {

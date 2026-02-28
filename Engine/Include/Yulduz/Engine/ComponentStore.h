@@ -26,8 +26,8 @@ YULDUZ_API void YULDUZ_ReleaseComponentStore(YULDUZ_ComponentStore *store);
 YULDUZ_API void YULDUZ_ReallocateComponentStore(
     YULDUZ_ComponentStore *store, uint32_t old_capacity, uint32_t new_capacity);
 
-YULDUZ_API void YULDUZ_CopyBackComponentInComponentStore(
-    const YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex index, YULDUZ_ComponentIndex back_index);
+YULDUZ_API void YULDUZ_CopyComponentInComponentStore(
+    const YULDUZ_ComponentStore *store, YULDUZ_ComponentIndex src_index, YULDUZ_ComponentIndex dst_index);
 
 // UNSAFE! CAUTION! returns a mapping pointer to the component at index. (The index must exist in the store or else
 // it may cause segmentation faults)

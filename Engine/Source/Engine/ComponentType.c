@@ -1,6 +1,6 @@
 #include <Yulduz/Engine/ComponentType.h>
 
-static void YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry, uint32_t count);
+static void YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry);
 
 bool YULDUZ_InitializeComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry, uint32_t initial_capacity) {
     SDL_zerop(registry);
@@ -29,103 +29,75 @@ void YULDUZ_ReleaseComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry)
     SDL_zerop(registry);
 }
 
-bool YULDUZ_RegisterComponentTypesInComponentTypeRegistry(
-    YULDUZ_ComponentTypeRegistry *registry, const YULDUZ_ComponentTypeDescription *type_descriptions,
-    YULDUZ_NULLABLE YULDUZ_ComponentType *types, uint32_t type_count) {
-    YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(registry, type_count);
+bool YULDUZ_RegisterComponentTypeInComponentTypeRegistry(
+    YULDUZ_ComponentTypeRegistry *registry, const YULDUZ_ComponentTypeDescription *type_description,
+    YULDUZ_NULLABLE YULDUZ_ComponentType *type) {
+    YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(registry);
 
-    bool registered_all = true;
-    for (uint32_t j = 0; j < type_count; j++) {
-        if (nullptr != types) {
-            types[j] = YULDUZ_INVALID_COMPONENT_TYPE;
-        }
-
-        if (0 == type_descriptions[j].Size) {
-            DYULDUZ_LOG_ENGINE_WARN("Types must have size > 0: '%s'", type_descriptions[j].Name);
-            registered_all = false;
-            continue;
-        }
-
-        if (YULDUZ_INVALID_COMPONENT_TYPE !=
-            SDL_GetNumberProperty(registry->HashMap, type_descriptions[j].Name, YULDUZ_INVALID_COMPONENT_TYPE)) {
-            DYULDUZ_LOG_ENGINE_WARN("Type with name '%s' already exists", type_descriptions[j].Name);
-            registered_all = false;
-            continue;
-        }
-
-        uint32_t index = registry->DenseCount;
-        registry->DenseCount++;
-
-        registry->Dense[index] = type_descriptions[j];
-        registry->Dense[index].Name =
-            SDL_strdup(type_descriptions[j].Name);
-
-        SDL_SetNumberProperty(registry->HashMap, registry->Dense[index].Name, index);
-
-        if (nullptr != types)
-            types[j] = index;
+    if (nullptr != type) {
+        *type = YULDUZ_INVALID_COMPONENT_TYPE;
     }
 
-    return registered_all;
+    if (0 == type_description->Size) {
+        DYULDUZ_LOG_ENGINE_WARN("Component Type must have size > 0: '%s'", type_description->Name);
+        return false;
+    }
+
+    if (YULDUZ_INVALID_COMPONENT_TYPE !=
+        SDL_GetNumberProperty(registry->HashMap, type_description->Name, YULDUZ_INVALID_COMPONENT_TYPE)) {
+        DYULDUZ_LOG_ENGINE_WARN("Component Type with name '%s' already registered", type_description->Name);
+        return false;
+    }
+
+    uint32_t index = registry->DenseCount;
+    registry->DenseCount++;
+
+    registry->Dense[index] = *type_description;
+    registry->Dense[index].Name =
+        SDL_strdup(type_description->Name);
+
+    SDL_SetNumberProperty(registry->HashMap, registry->Dense[index].Name, index);
+
+    if (nullptr != type)
+        *type = index;
+
+    return true;
 }
 
-bool YULDUZ_GetComponentTypesInComponentTypeRegistry(
-    const YULDUZ_ComponentTypeRegistry *registry, const char **type_names, YULDUZ_ComponentType *types, uint32_t type_count) {
-    bool found_all = true;
-
-    for (uint32_t j = 0; j < type_count; j++) {
-        types[j] = YULDUZ_INVALID_COMPONENT_TYPE;
-
-        types[j] = SDL_GetNumberProperty(registry->HashMap, type_names[j], YULDUZ_INVALID_COMPONENT_TYPE);
-
-        found_all = found_all && YULDUZ_INVALID_COMPONENT_TYPE != types[j];
-    }
-
-    return found_all;
+bool YULDUZ_GetComponentTypeInComponentTypeRegistry(
+    const YULDUZ_ComponentTypeRegistry *registry, const char *type_name, YULDUZ_ComponentType *type) {
+    *type = SDL_GetNumberProperty(registry->HashMap, type_name, YULDUZ_INVALID_COMPONENT_TYPE);
+    return YULDUZ_INVALID_COMPONENT_TYPE != *type;
 }
 
-bool YULDUZ_GetComponentTypeInfosInComponentTypeRegistry(
-    const YULDUZ_ComponentTypeRegistry *registry, const char **type_names,
-    YULDUZ_ComponentTypeInfo *type_infos, uint32_t type_count) {
-    bool found_all = true;
+bool YULDUZ_GetComponentTypeInfoInComponentTypeRegistry(
+    const YULDUZ_ComponentTypeRegistry *registry, const char *type_name, YULDUZ_ComponentTypeInfo *type_info) {
+    *type_info = YULDUZ_NULL_COMPONENT_TYPE_INFO;
 
-    for (uint32_t j = 0; j < type_count; j++) {
-        type_infos[j] = YULDUZ_NULL_COMPONENT_TYPE_INFO;
+    YULDUZ_ComponentType type = SDL_GetNumberProperty(registry->HashMap, type_name, YULDUZ_INVALID_COMPONENT_TYPE);
 
-        YULDUZ_ComponentType type = SDL_GetNumberProperty(
-            registry->HashMap, type_names[j], YULDUZ_INVALID_COMPONENT_TYPE);
-
-        if (YULDUZ_INVALID_COMPONENT_TYPE == type) {
-            found_all = false;
-            continue;
-        }
-
-        type_infos[j].Type      = type;
-        type_infos[j].Size      = registry->Dense[type].Size;
-        type_infos[j].Alignment = registry->Dense[type].Alignment;
+    if (YULDUZ_INVALID_COMPONENT_TYPE == type) {
+        return false;
     }
 
-    return found_all;
+    type_info->Type      = type;
+    type_info->Size      = registry->Dense[type].Size;
+    type_info->Alignment = registry->Dense[type].Alignment;
+
+    return true;
 }
 
-bool YULDUZ_GetComponentTypeDescriptionsInComponentTypeRegistry(
-    const YULDUZ_ComponentTypeRegistry *registry, const YULDUZ_ComponentType *types,
-    YULDUZ_ComponentTypeDescription *type_descriptions, uint32_t type_count) {
-    bool found_all = true;
-
-    SDL_memset(type_descriptions, 0, type_count * sizeof(YULDUZ_ComponentTypeDescription));
-
-    for (uint32_t j = 0; j < type_count; j++) {
-        uint32_t index = types[j];
-        if (index >= registry->DenseCount) {
-            found_all = false;
-            continue;
-        }
-
-        type_descriptions[j] = registry->Dense[index];
+bool YULDUZ_GetComponentTypeDescriptionInComponentTypeRegistry(
+    const YULDUZ_ComponentTypeRegistry *registry, YULDUZ_ComponentType type,
+    YULDUZ_ComponentTypeDescription *type_description) {
+    if (type >= registry->DenseCount) {
+        *type_description = YULDUZ_NULL_COMPONENT_TYPE_DESCRIPTION;
+        return false;
     }
 
-    return found_all;
+    *type_description = registry->Dense[type];
+
+    return true;
 }
 
 void YULDUZ_GetComponentTypeDescriptionUnsafeInComponentTypeRegistry(
@@ -154,18 +126,15 @@ void YULDUZ_SDL_SortComponentTypeDataInfos(YULDUZ_ComponentTypeDataInfo *infos, 
     SDL_qsort(infos, count, sizeof(YULDUZ_ComponentTypeDataInfo), YULDUZ_SDL_CompareComponentTypes);
 }
 
-void YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry, uint32_t count) {
-    uint32_t new_count = registry->DenseCount + count;
-    if (new_count < registry->DenseCapacity) {
+void YULDUZ_EnsureDenseCapacityInComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry) {
+    if (registry->DenseCount < registry->DenseCapacity) {
         return;
     }
 
     uint32_t new_capacity = registry->DenseCapacity * 2;
-    while (new_capacity <= new_count) {
-        new_capacity *= 2;
-    }
 
-    YULDUZ_ComponentTypeDescription *new_dense = SDL_realloc(registry->Dense, sizeof(YULDUZ_ComponentTypeDescription) * new_capacity);
+    YULDUZ_ComponentTypeDescription *new_dense = SDL_realloc(
+        registry->Dense, sizeof(YULDUZ_ComponentTypeDescription) * new_capacity);
 
     registry->DenseCapacity = new_capacity;
     registry->Dense         = new_dense;

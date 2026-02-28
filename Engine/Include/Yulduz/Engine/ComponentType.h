@@ -54,45 +54,41 @@ struct YULDUZ_ComponentTypeInfo {
 
 constexpr YULDUZ_ComponentType YULDUZ_INVALID_COMPONENT_TYPE = 0xFFFFFFFF;
 
-#define YULDUZ_NULL_COMPONENT_TYPE_DESCRIPTION \
-    (YULDUZ_ComponentTypeDescription) {        \
-        .Name         = nullptr,               \
-        .Size         = 0,                     \
-        .Alignment    = 0,                     \
-        .OnCreatePFN  = nullptr,               \
-        .OnDestroyPFN = nullptr,               \
-        .OnClonePFN   = nullptr,               \
-        .UserData     = nullptr,               \
-    }
-#define YULDUZ_NULL_COMPONENT_TYPE_INFO             \
-    (YULDUZ_ComponentTypeInfo) {                    \
-        .Type      = YULDUZ_INVALID_COMPONENT_TYPE, \
-        .Size      = 0,                             \
-        .Alignment = 0,                             \
-    }
+constexpr YULDUZ_ComponentTypeDescription YULDUZ_NULL_COMPONENT_TYPE_DESCRIPTION = (YULDUZ_ComponentTypeDescription){
+    .Name         = nullptr,
+    .Size         = 0,
+    .Alignment    = 0,
+    .OnCreatePFN  = nullptr,
+    .OnDestroyPFN = nullptr,
+    .OnClonePFN   = nullptr,
+    .UserData     = nullptr,
+};
 
-#define YULDUZ_NULL_COMPONENT_TYPE_DATA_INFO   \
-    (YULDUZ_ComponentTypeDataInfo) {           \
-        .Type = YULDUZ_INVALID_COMPONENT_TYPE, \
-        .Data = nullptr,                       \
-    }
+constexpr YULDUZ_ComponentTypeInfo YULDUZ_NULL_COMPONENT_TYPE_INFO = (YULDUZ_ComponentTypeInfo){
+    .Type      = YULDUZ_INVALID_COMPONENT_TYPE,
+    .Size      = 0,
+    .Alignment = 0,
+};
+
+constexpr YULDUZ_ComponentTypeDataInfo YULDUZ_NULL_COMPONENT_TYPE_DATA_INFO = (YULDUZ_ComponentTypeDataInfo){
+    .Type = YULDUZ_INVALID_COMPONENT_TYPE,
+    .Data = nullptr,
+};
 
 YULDUZ_API bool YULDUZ_InitializeComponentTypeRegistry(
     YULDUZ_ComponentTypeRegistry *registry, uint32_t initial_capacity);
 YULDUZ_API void YULDUZ_ReleaseComponentTypeRegistry(YULDUZ_ComponentTypeRegistry *registry);
 
-YULDUZ_API bool YULDUZ_RegisterComponentTypesInComponentTypeRegistry(
-    YULDUZ_ComponentTypeRegistry *registry, const YULDUZ_ComponentTypeDescription *type_descriptions,
-    YULDUZ_NULLABLE YULDUZ_ComponentType *types, uint32_t type_count);
-YULDUZ_API bool YULDUZ_GetComponentTypesInComponentTypeRegistry(
-    const YULDUZ_ComponentTypeRegistry *registry, const char **type_names,
-    YULDUZ_ComponentType *types, uint32_t type_count);
-YULDUZ_API bool YULDUZ_GetComponentTypeInfosInComponentTypeRegistry(
-    const YULDUZ_ComponentTypeRegistry *registry, const char **type_names,
-    YULDUZ_ComponentTypeInfo *type_infos, uint32_t type_count);
-YULDUZ_API bool YULDUZ_GetComponentTypeDescriptionsInComponentTypeRegistry(
-    const YULDUZ_ComponentTypeRegistry *registry, const YULDUZ_ComponentType *types,
-    YULDUZ_ComponentTypeDescription *type_descriptions, uint32_t type_count);
+YULDUZ_API bool YULDUZ_RegisterComponentTypeInComponentTypeRegistry(
+    YULDUZ_ComponentTypeRegistry *registry, const YULDUZ_ComponentTypeDescription *type_description,
+    YULDUZ_NULLABLE YULDUZ_ComponentType *type);
+YULDUZ_API bool YULDUZ_GetComponentTypeInComponentTypeRegistry(
+    const YULDUZ_ComponentTypeRegistry *registry, const char *type_name, YULDUZ_ComponentType *type);
+YULDUZ_API bool YULDUZ_GetComponentTypeInfoInComponentTypeRegistry(
+    const YULDUZ_ComponentTypeRegistry *registry, const char *type_name, YULDUZ_ComponentTypeInfo *type_info);
+YULDUZ_API bool YULDUZ_GetComponentTypeDescriptionInComponentTypeRegistry(
+    const YULDUZ_ComponentTypeRegistry *registry, YULDUZ_ComponentType type,
+    YULDUZ_ComponentTypeDescription *type_description);
 
 YULDUZ_API void YULDUZ_GetComponentTypeDescriptionUnsafeInComponentTypeRegistry(
     const YULDUZ_ComponentTypeRegistry *registry, YULDUZ_ComponentType type,

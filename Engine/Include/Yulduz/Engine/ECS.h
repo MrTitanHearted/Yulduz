@@ -20,11 +20,9 @@ typedef struct YULDUZ_ArchetypeComponentTransitions
     YULDUZ_ArchetypeComponentTransitions;
 
 struct YULDUZ_ECSRegistry {
-    YULDUZ_EntityRegistry EntityRegistry;
-
-    YULDUZ_TagTypeRegistry TagTypeRegistry;
-
-    YULDUZ_ComponentTypeRegistry ComponentTypeRegistry;
+    YULDUZ_ComponentTypeRegistry *ComponentTypeRegistry;
+    YULDUZ_TagTypeRegistry       *TagTypeRegistry;
+    YULDUZ_EntityRegistry        *EntityRegistry;
 
     YULDUZ_Archetype *Dense;
 
@@ -41,9 +39,10 @@ struct YULDUZ_ECSRegistry {
 };
 
 struct YULDUZ_ECSRegistryInitializeInfo {
-    uint32_t InitialEntityCapacity;
-    uint32_t InitialTagTypeCapacity;
-    uint32_t InitialComponentTypeCapacity;
+    YULDUZ_ComponentTypeRegistry *ComponentTypeRegistry;
+    YULDUZ_TagTypeRegistry       *TagTypeRegistry;
+    YULDUZ_EntityRegistry        *EntityRegistry;
+
     uint32_t InitialArchetypeCapacity;
     uint32_t InitialArchetypeTypeCapacity;
 };
@@ -79,14 +78,14 @@ struct YULDUZ_ArchetypeComponentTransitions {
 };
 
 YULDUZ_API bool YULDUZ_InitializeECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_NULLABLE const YULDUZ_ECSRegistryInitializeInfo *info);
+    YULDUZ_ECSRegistry *registry, const YULDUZ_ECSRegistryInitializeInfo *info);
 YULDUZ_API void YULDUZ_ReleaseECSRegistry(YULDUZ_ECSRegistry *registry);
 
 YULDUZ_API bool YULDUZ_RegisterTagTypeInECSRegistry(
     YULDUZ_ECSRegistry *registry, const char *name, YULDUZ_NULLABLE YULDUZ_TagType *type);
 
 YULDUZ_API bool YULDUZ_RegisterComponentTypeInECSRegistry(
-    YULDUZ_ECSRegistry *registry, YULDUZ_ComponentTypeDescription description,
+    YULDUZ_ECSRegistry *registry, const YULDUZ_ComponentTypeDescription *description,
     YULDUZ_NULLABLE YULDUZ_ComponentType *type);
 
 YULDUZ_API bool YULDUZ_GetTagTypeInECSRegistry(

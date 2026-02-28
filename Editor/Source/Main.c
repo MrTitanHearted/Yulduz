@@ -1,12 +1,5 @@
 #include <Yulduz/Engine.h>
 
-// Forward declarations for test runners
-void run_all_ecs_registry_tests(void);  // Comprehensive tests
-void run_all_system_tests(void);
-
-// Forward declarations for benchmark runners
-void run_all_ecs_benchmarks(void);  // Comprehensive benchmarks
-
 void AssertFN(void *user_data, YULDUZ_AssertEntry *entry);
 void LogFN(YULDUZ_Logger *logger, YULDUZ_LogEntry *entry);
 
@@ -19,75 +12,43 @@ int32_t main(int32_t argc, char **argv) {
     context_initialize_info.AssertPFN         = &AssertFN;
     context_initialize_info.AssertUserData    = nullptr;
     context_initialize_info.EngineLogger      = (YULDUZ_Logger){"ENGINE", nullptr, &LogFN, YULDUZ_LogLevel_Trace};
-    context_initialize_info.ApplicationLogger = (YULDUZ_Logger){"TESTS", nullptr, &LogFN, YULDUZ_LogLevel_Trace};
+    context_initialize_info.ApplicationLogger = (YULDUZ_Logger){"EDITOR", nullptr, &LogFN, YULDUZ_LogLevel_Trace};
 
     YULDUZ_Context context = {0};
     YULDUZ_InitializeContext(&context, context_initialize_info);
 
-    YULDUZ_LOG_INFO("\n");
-    YULDUZ_LOG_INFO("================================================================================");
-    YULDUZ_LOG_INFO("                    YULDUZ ECS FRAMEWORK TEST SUITE");
-    YULDUZ_LOG_INFO("================================================================================\n");
+    YULDUZ_Engine engine = {0};
+    YULDUZ_InitializeEngine(&engine, nullptr);
 
-    bool run_tests      = true;
-    bool run_benchmarks = true;
+    YULDUZ_StartEngine(&engine);
 
-    // Parse command line arguments
-    for (int32_t i = 1; i < argc; i++) {
-        if (SDL_strcmp(argv[i], "--tests-only") == 0) {
-            run_benchmarks = false;
-        } else if (SDL_strcmp(argv[i], "--benchmarks-only") == 0) {
-            run_tests = false;
-        } else if (SDL_strcmp(argv[i], "--help") == 0) {
-            YULDUZ_LOG_INFO("Usage: %s [OPTIONS]\n", argv[0]);
-            YULDUZ_LOG_INFO("Options:\n");
-            YULDUZ_LOG_INFO("  --tests-only       Run only tests, skip benchmarks\n");
-            YULDUZ_LOG_INFO("  --benchmarks-only  Run only benchmarks, skip tests\n");
-            YULDUZ_LOG_INFO("  --help             Show this help message\n");
-            YULDUZ_ReleaseContext(&context);
-            return 0;
+    SDL_Window   *window   = nullptr;
+    SDL_Renderer *renderer = nullptr;
+    SDL_CreateWindowAndRenderer(
+        "Yulduz", 1200, 1000, SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE,
+        &window, &renderer);
+
+    SDL_ShowWindow(window);
+
+    while (YULDUZ_IsRunningInEngine(&engine)) {
+        SDL_Event event = {0};
+        while (SDL_PollEvent(&event)) {
+            switch (event.type) {
+                case SDL_EVENT_WINDOW_CLOSE_REQUESTED: {
+                    YULDUZ_StopEngine(&engine);
+                } break;
+                default:
+            }
         }
+
+        SDL_RenderClear(renderer);
+        SDL_RenderPresent(renderer);
     }
 
-    // ========================================
-    // Run Tests
-    // ========================================
-    if (run_tests) {
-        YULDUZ_LOG_INFO("\n");
-        YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
-        YULDUZ_LOG_INFO("║                              RUNNING TESTS                     ║");
-        YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝");
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
 
-        run_all_ecs_registry_tests();
-        run_all_system_tests();
-
-        YULDUZ_LOG_INFO("\n");
-        YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
-        YULDUZ_LOG_INFO("║                           TESTS COMPLETED                      ║");
-        YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝\n");
-    }
-
-    // ========================================
-    // Run Benchmarks
-    // ========================================
-    if (run_benchmarks) {
-        YULDUZ_LOG_INFO("\n");
-        YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
-        YULDUZ_LOG_INFO("║                           RUNNING BENCHMARKS                   ║");
-        YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝");
-
-        run_all_ecs_benchmarks();
-
-        YULDUZ_LOG_INFO("\n");
-        YULDUZ_LOG_INFO("╔════════════════════════════════════════════════════════════════╗");
-        YULDUZ_LOG_INFO("║                        BENCHMARKS COMPLETED                    ║");
-        YULDUZ_LOG_INFO("╚════════════════════════════════════════════════════════════════╝\n");
-    }
-
-    YULDUZ_LOG_INFO("\n");
-    YULDUZ_LOG_INFO("================================================================================");
-    YULDUZ_LOG_INFO("                         ALL OPERATIONS COMPLETED");
-    YULDUZ_LOG_INFO("================================================================================\n");
+    YULDUZ_ReleaseEngine(&engine);
 
     YULDUZ_ReleaseContext(&context);
     return 0;
