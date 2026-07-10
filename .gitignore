@@ -9,3 +9,16 @@ install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
 _deps
+CMakeUserPresets.json
+
+.vs/
+.vscode/
+.idea/
+vcpkg_installed/
+
+build*/
+Build*/
+cmake-build*/
+CMake-Build*/
+
+imgui.ini
