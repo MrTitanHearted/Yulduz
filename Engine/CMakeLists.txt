@@ -24,9 +24,9 @@ add_library(YulduzEngine ${YULDUZ_BUILD_LIBS_TYPE}
 add_library(Yulduz::Engine ALIAS YulduzEngine)
 
 if (BUILD_SHARED_LIBS)
-    target_compile_definitions(YulduzEngine PUBLIC YULDUZ_ENGINE_STATIC)
-else ()
     target_compile_definitions(YulduzEngine PUBLIC YULDUZ_ENGINE_SHARED)
+else ()
+    target_compile_definitions(YulduzEngine PUBLIC YULDUZ_ENGINE_STATIC)
 endif ()
 
 target_compile_definitions(YulduzEngine PRIVATE YULDUZ_ENGINE_BUILD)

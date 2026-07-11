@@ -21,7 +21,7 @@ target_include_directories(YulduzHelloWorld PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/
 
 target_link_libraries(YulduzHelloWorld PRIVATE Yulduz::Engine)
 
-target_precompile_headers(YulduzHelloWorld REUSE_FROM Yulduz::Engine)
+#target_precompile_headers(YulduzHelloWorld REUSE_FROM Yulduz::Engine)
 
 if (WIN32 AND WIN32_RELEASE_MODE_NO_CONSOLE)
     if (MSVC)
