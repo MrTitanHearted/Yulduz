@@ -7,8 +7,11 @@ typedef struct App App;
 struct App {
     YULDUZ_Engine *Engine;
 
-    SDL_Window   *Window;
-    SDL_Renderer *Renderer;
+    SDL_Window    *Window;
+    SDL_Renderer  *Renderer;
+    SDL_GPUDevice *GPUDevice;
+
+    YULDUZ_MemoryArena MemoryArena;
 };
 
 bool AppOnInit(YULDUZ_Engine *engine);

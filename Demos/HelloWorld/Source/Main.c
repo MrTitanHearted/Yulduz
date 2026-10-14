@@ -5,7 +5,7 @@ Sint32 main() {
 
     App app = {0};
 
-    YULDUZ_EngineInitInfo engine_init_info = {
+    const YULDUZ_EngineInitInfo engine_init_info = {
         .UserData = &app,
 
         .MaxTickCount = 0,

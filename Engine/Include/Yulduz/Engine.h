@@ -2,6 +2,9 @@
 
 #include <Yulduz/PCH.h>
 
+#include <Yulduz/Memory.h>
+#include <Yulduz/Signal.h>
+
 typedef struct YULDUZ_EngineInitInfo YULDUZ_EngineInitInfo;
 
 typedef struct YULDUZ_Engine YULDUZ_Engine;
